@@ -1,0 +1,15 @@
+  {
+    "name": "Scriv2Fic",
+    "version": "1.0",
+    "description": "Browser extension that enables direct conversion and uploading of scrivener projects to fimfiction.net.",
+    "manifest_version": 2,
+    "permissions": [
+    	"activeTab"
+    ],
+    "content_scripts": [
+    	{
+    		"matches": ["https://www.fimfiction.net/story/*"],
+    		"js":["addService.js"]
+    	}
+    ]
+  }
