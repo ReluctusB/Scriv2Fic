@@ -6,6 +6,10 @@
     "permissions": [
     	"activeTab"
     ],
+    "background": {
+    	"scripts": ["backgroundWorker.js"],
+    	"persistent": false
+    },
     "content_scripts": [
     	{
     		"matches": ["https://www.fimfiction.net/story/*"],

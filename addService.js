@@ -22,10 +22,12 @@ function addService() {
 
 function processFiles(fileList) {
 	const scrivx = findScrivx(fileList);
-
 	document.getElementById("scrivTitle").innerHTML = "";
 	document.getElementById("scrivDir").innerHTML = "";
 	buildDirectory(scrivx);
+	document.getElementById("submitScriv").disabled = false;
+	document.getElementById("submitScriv").addEventListener("click", ()=>{prepSubmit(scrivx, 1)});
+
 }
 
 function findScrivx(fileList) {
@@ -39,15 +41,15 @@ function findScrivx(fileList) {
 }
 
 function generateListing(file, level) {
-	//console.log(file.nodeName);
 	let titleEle = file.getElementsByTagName("Title")[0].childNodes[0];
 	const title = titleEle ? titleEle.nodeValue : "Untitled";
+	const ident = file.getAttribute("ID");
 	let icon = "file-text";
 	let include = file.getElementsByTagName("IncludeInCompile")[0] ? true : false;
 	if (file.getAttribute("Type").endsWith("Folder")) {icon = "folder"}
 	let listString = `<span class='checkbox' style="margin-left: ${level.toString()}rem">
 						<label class='styled-checkbox'>
-							<input type='checkbox' class='compileIncludeBox' value = ${title.replace(" ","-")} ${include?"checked":""}>
+							<input type='checkbox' class='compileIncludeBox' value = ${ident+"-"+level+"-"+title.replace(" ","_")} ${include?"checked":""}>
 							<a></a>
 						</label>
 					</span> <i class="fa fa-${icon}" style="margin-right:.5rem"></i> ${level>0?title:"<b>"+title+"</b>"}`
@@ -85,8 +87,7 @@ const stringUI = `
 		<ul class="files" id="scrivDir"></ul>
 	</div>
 	<div class="footer-bar">
-		<button class="styled_button">Import Project</button>
-
+		<button class="styled_button" disabled="true" id="submitScriv">Import Project</button>
 	</div>
 	`
 
@@ -116,6 +117,40 @@ function buildUI() {
 	document.querySelector("div[data-element='fileSelector']").className = "hidden";
 	document.querySelector("div[data-element='serviceSelector']").className = "hidden";	
 	document.getElementById("scrivSelector").className = "";
+}
+
+//ID, level, title
+
+function prepSubmit(scrivx, chapterLevel) {
+	console.log("Woohoo!");
+	const storyTitle = document.querySelector("#scrivTitle > input").value;	
+	let xmlDoc = document.implementation.createDocument(null, storyTitle);
+	const includeBoxes = document.getElementsByClassName("compileIncludeBox");
+	let curChapterNode = null;
+	for (let i=0;i<includeBoxes.length;i++) {
+		if (includeBoxes[i].checked) {
+			let valArr = includeBoxes[i].value.split("-");
+			if (valArr[1] == chapterLevel) {
+				curChapterNode = xmlDoc.createElement("Chapter");
+				curChapterNode.setAttribute("Title",valArr[2])
+				xmlDoc.firstChild.appendChild(curChapterNode);				
+			}
+			if (curChapterNode) {
+				let scrivening = xmlDoc.createElement("Scrivening");
+				scrivening.setAttribute("ID", valArr[0]);
+				curChapterNode.appendChild(scrivening);
+			}
+		}
+	}
+	let serializer = new XMLSerializer();
+	const compileThese = serializer.serializeToString(xmlDoc);
+	console.log(compileThese);
+}
+
+function submitToWorker(files, chapterLevel) {
+	chrome.runtime.sendMessage({
+		scrivDocs:files,
+	});
 }
 
 var files;
