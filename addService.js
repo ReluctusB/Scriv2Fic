@@ -145,20 +145,17 @@ function prepSubmit(scrivx, chapterLevel) {
 	let serializer = new XMLSerializer();
 	const compileThese = serializer.serializeToString(xmlDoc);
 	console.log(compileThese);
+	submitToWorker(files, compileThese)
 }
 
-function submitToWorker(files, chapterLevel) {
-	chrome.runtime.sendMessage({
-		scrivDocs:files,
+function submitToWorker(files, compileOrder) {
+	chrome.runtime.sendMessage({greeting: "url"}, function(response) {
+	  console.log(response.farewell);
 	});
 }
 
-var files;
+let files;
 
 if (document.getElementsByClassName("fa-upload")[0]) {
 	document.querySelector("a[data-click='importChapter']").addEventListener("click", addService);
 }
-
-chrome.runtime.sendMessage({greeting: "url"}, function(response) {
-  console.log(response.farewell);
-});
