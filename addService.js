@@ -71,7 +71,7 @@ function buildDirectory(scrivx) {
 		const scrivxContents = evt.target.result;
 		const parser = new DOMParser();
 		const xmlDoc = parser.parseFromString(scrivxContents, "text/xml");
-		document.getElementById("scrivTitle").appendChild(eleBuilder("INPUT", {type:"text", value:scrivx.name.replace(".scrivx",""), style:"font-weight:bold;"}))
+		document.getElementById("scrivTitle").innerText = scrivx.name.replace(".scrivx","")
 		const topLevelFiles = xmlDoc.querySelectorAll("Binder > BinderItem[Type=DraftFolder]");
 		buildHierarchy(topLevelFiles, 0);
 	}	
@@ -82,7 +82,7 @@ const stringUI = `
 		<div class="flex" style="margin-bottom:0.5rem;"></div>
 		<div class='styled-input'></div>
 	</div>
-	<div class="styled-input" id="scrivTitle"></div>
+	<div id="scrivTitle" style="font-weight:bold; font-size:1.1rem;"></div>
 	<div class="files-container" style=overflow:auto;">
 		<ul class="files" id="scrivDir"></ul>
 	</div>
@@ -123,7 +123,7 @@ function buildUI() {
 
 function prepSubmit(scrivx, chapterLevel) {
 	console.log("Woohoo!");
-	const storyTitle = document.querySelector("#scrivTitle > input").value;	
+	const storyTitle = document.getElementById("scrivTitle").innerText;	
 	let xmlDoc = document.implementation.createDocument(null, storyTitle);
 	const includeBoxes = document.getElementsByClassName("compileIncludeBox");
 	let curChapterNode = null;
@@ -158,3 +158,7 @@ var files;
 if (document.getElementsByClassName("fa-upload")[0]) {
 	document.querySelector("a[data-click='importChapter']").addEventListener("click", addService);
 }
+
+chrome.runtime.sendMessage({greeting: "url"}, function(response) {
+  console.log(response.farewell);
+});

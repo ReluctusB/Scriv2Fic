@@ -1,19 +1,16 @@
-  {
-    "name": "Scriv2Fic",
-    "version": "1.0",
-    "description": "Browser extension that enables direct conversion and uploading of scrivener projects to fimfiction.net.",
-    "manifest_version": 2,
-    "permissions": [
-    	"activeTab"
-    ],
-    "background": {
-    	"scripts": ["backgroundWorker.js"],
-    	"persistent": false
-    },
-    "content_scripts": [
-    	{
-    		"matches": ["https://www.fimfiction.net/story/*"],
-    		"js":["addService.js"]
-    	}
-    ]
-  }
+{
+   "background": {
+      "persistent": false,
+      "scripts": [ "backgroundWorker.js" ]
+   },
+   "content_scripts": [ {
+      "js": [ "addService.js" ],
+      "matches": [ "https://www.fimfiction.net/story/*" ]
+   } ],
+   "description": "Browser extension that enables direct conversion and uploading of scrivener projects to fimfiction.net.",
+   "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoSIv47NiP+zm1vy7HfEhJbvzv7W1YA6KIBD7qXFmmjOGhPVPJT7gnn9usluH2Nju/k9Z2CQhjtWzAlryD1EpLYNOgBf8U2lHYakqayDolkN5J7JdipNj3KO+fy5JeRbAMtNJzubjmxneqESRjGxFpfTWSFDkApN2SUI0lttAtLZczlMkeNnM4Bf9zkt1AC0cNzQfdB8bsgPz/kdk1MGw8XM47wbTwDzQ0SRJrV/y9KPYTN7qDn1WXj1j3du0EBXrxmovKytsFS2C3b2AvEf296pBionnS65lZUhx1clBZ9hKWJpZMu5W4Jhh9FpIS62781I9ETScfKRYGpn5EsAJvwIDAQAB",
+   "manifest_version": 2,
+   "name": "Scriv2Fic",
+   "permissions": [ "activeTab", "identity" ],
+   "version": "1.0"
+}
