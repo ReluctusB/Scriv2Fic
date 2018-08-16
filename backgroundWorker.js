@@ -3,10 +3,13 @@ chrome.runtime.onMessage.addListener(
     console.log(sender.tab ?
                 "from a content script:" + sender.tab.url :
                 "from the extension");
-    makeChapter(417170);
-    if (request.greeting == "url")
-      sendResponse({farewell: chrome.identity.getRedirectURL()});
-  }
+    //makeChapter(417170);
+    const files = request.files;
+    const compileOrder = request.compileOrder;
+    //reader = new fileReader;
+    console.log(files);
+      sendResponse({farewell: "Thanks!"});
+	}
 );
 
 function makeChapter(storyID) {

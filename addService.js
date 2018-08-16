@@ -11,6 +11,17 @@ function eleBuilder(eleStr, propObj) {
     return ele;
 }
 
+function findFileByName(fileName, fileList) {
+	for (let i=0;i<fileList.length;i++) {
+		console.log(fileList[i].name);
+		if (fileList[i].name === fileName) {
+			return fileList[i];
+		}
+	}
+	console.error("Couldn't find file " + fileName);
+	return null;
+}
+
 function addService() {
 	if (document.getElementsByClassName("services")[0]) {
 		document.querySelector("div[data-element='serviceSelector']").insertAdjacentHTML("afterBegin","<ul class='services'><li id='s2f'>Scriv2Fic (Local)</li></ul>");
@@ -26,7 +37,7 @@ function processFiles(fileList) {
 	document.getElementById("scrivDir").innerHTML = "";
 	buildDirectory(scrivx);
 	document.getElementById("submitScriv").disabled = false;
-	document.getElementById("submitScriv").addEventListener("click", ()=>{prepSubmit(scrivx, 1)});
+	document.getElementById("submitScriv").addEventListener("click", ()=>{prepSubmit(scrivx, 1);});
 
 }
 
@@ -37,28 +48,28 @@ function findScrivx(fileList) {
 		}
 	}
 	window.alert("Couldn't find a .scrivx file!");
-	return [];
+	return;
 }
 
 function generateListing(file, level) {
 	let titleEle = file.getElementsByTagName("Title")[0].childNodes[0];
 	const title = titleEle ? titleEle.nodeValue : "Untitled";
-	const ident = file.getAttribute("ID");
+	const ident = file.getAttribute("Type") != "Folder" ? file.getAttribute("ID") : "Folder";
 	let icon = "file-text";
 	let include = file.getElementsByTagName("IncludeInCompile")[0] ? true : false;
-	if (file.getAttribute("Type").endsWith("Folder")) {icon = "folder"}
+	if (file.getAttribute("Type").endsWith("Folder")) {icon = "folder";}
 	let listString = `<span class='checkbox' style="margin-left: ${level.toString()}rem">
 						<label class='styled-checkbox'>
 							<input type='checkbox' class='compileIncludeBox' value = ${ident+"-"+level+"-"+title.replace(" ","_")} ${include?"checked":""}>
 							<a></a>
 						</label>
-					</span> <i class="fa fa-${icon}" style="margin-right:.5rem"></i> ${level>0?title:"<b>"+title+"</b>"}`
+					</span> <i class="fa fa-${icon}" style="margin-right:.5rem"></i> ${level>0?title:"<b>"+title+"</b>"}`;
 	return eleBuilder("LI",{HTML:listString});
 }
 
 function buildHierarchy(fileList, level) {
 	for (let i=0;i<fileList.length;i++) {
-		document.getElementById("scrivDir").appendChild(generateListing(fileList[i], level))	
+		document.getElementById("scrivDir").appendChild(generateListing(fileList[i], level));
 		let kids = fileList[i].getElementsByTagName("Children")[0];
 		if (kids) {buildHierarchy(kids.children, level + 1);}		
 	}
@@ -71,10 +82,10 @@ function buildDirectory(scrivx) {
 		const scrivxContents = evt.target.result;
 		const parser = new DOMParser();
 		const xmlDoc = parser.parseFromString(scrivxContents, "text/xml");
-		document.getElementById("scrivTitle").innerText = scrivx.name.replace(".scrivx","")
+		document.getElementById("scrivTitle").innerText = scrivx.name.replace(".scrivx","");
 		const topLevelFiles = xmlDoc.querySelectorAll("Binder > BinderItem[Type=DraftFolder]");
 		buildHierarchy(topLevelFiles, 0);
-	}	
+	};
 }
 
 const stringUI = `
@@ -89,31 +100,31 @@ const stringUI = `
 	<div class="footer-bar">
 		<button class="styled_button" disabled="false" id="submitScriv">Import Project</button>
 	</div>
-	`
+	`;
 
 function goBack() {
 	document.querySelector("div[data-element='serviceSelector']").className = "";	
 	document.getElementById("scrivSelector").className = "hidden";
-	document.querySelector(".drop-down-pop-up h1 > span").innerText = "Select a Service"
+	document.querySelector(".drop-down-pop-up h1 > span").innerText = "Select a Service";
 }
 
 function buildUI() {
 	const importPopup = document.getElementsByClassName("import-files-popup")[0];
 	if (!document.getElementById("scrivSelector")) {
-		const scrivSelector = eleBuilder("DIV", {HTML:stringUI, id:"scrivSelector"})
+		const scrivSelector = eleBuilder("DIV", {HTML:stringUI, id:"scrivSelector"});
 		scrivSelector.innerHTML = stringUI;
 		const fileInput = eleBuilder("INPUT",{id:"scrivDrop", type:"file"});
 		fileInput.webkitdirectory = "true";
 		fileInput.accept = ".scriv";
-		fileInput.addEventListener("input",()=>{files=fileInput.files;processFiles(files);})
+		fileInput.addEventListener("input",()=>{files=fileInput.files;processFiles(files);});
 		scrivSelector.getElementsByClassName("styled-input")[0].append(fileInput);
 		const backButton = eleBuilder("A",{HTML:"<i class='fa fa-arrow-left'></i>", event:["click", goBack]});
 		backButton.style.marginRight = "0.5rem";
-		scrivSelector.getElementsByClassName("flex")[0].appendChild(backButton)
+		scrivSelector.getElementsByClassName("flex")[0].appendChild(backButton);
 		scrivSelector.getElementsByClassName("flex")[0].appendChild(eleBuilder("SPAN",{text:"Scriv2Fic"}));
 		importPopup.appendChild(scrivSelector);
 	}	
-	document.querySelector(".drop-down-pop-up h1 > span").innerText = "Select a Project Folder"
+	document.querySelector(".drop-down-pop-up h1 > span").innerText = "Select a Project Folder";
 	document.querySelector("div[data-element='fileSelector']").className = "hidden";
 	document.querySelector("div[data-element='serviceSelector']").className = "hidden";	
 	document.getElementById("scrivSelector").className = "";
@@ -122,33 +133,50 @@ function buildUI() {
 //ID, level, title
 
 function prepSubmit(scrivx, chapterLevel) {
-	const storyTitle = document.getElementById("scrivTitle").innerText;	
-	let xmlDoc = document.implementation.createDocument(null, storyTitle);
+
+	function waitForProcess() {
+		if (startedOperations === finishedOperations) {
+			console.log(outputXML);
+		} else {
+			setTimeout(waitForProcess,1000);
+		}
+	}
+	let outputXML = document.implementation.createDocument(null, "Story");
 	const includeBoxes = document.getElementsByClassName("compileIncludeBox");
 	let curChapterNode = null;
+	let startedOperations = 0, finishedOperations = 0;
 	for (let i=0;i<includeBoxes.length;i++) {
 		if (includeBoxes[i].checked) {
 			let valArr = includeBoxes[i].value.split("-");
 			if (valArr[1] == chapterLevel) {
-				curChapterNode = xmlDoc.createElement("Chapter");
-				curChapterNode.setAttribute("Title",valArr[2])
-				xmlDoc.firstChild.appendChild(curChapterNode);				
+				curChapterNode = outputXML.createElement("Chapter");
+				curChapterNode.setAttribute("Title",valArr[2]);
+				outputXML.firstChild.appendChild(curChapterNode);				
 			}
 			if (curChapterNode) {
-				let scrivening = xmlDoc.createElement("Scrivening");
+				if (valArr[0] === "Folder") {continue;}
+				let scrivening = outputXML.createElement("Scrivening");
 				scrivening.setAttribute("ID", valArr[0]);
 				curChapterNode.appendChild(scrivening);
+				const reader = new FileReader();
+				reader.onloadstart = () => {startedOperations++;};
+				reader.onload = () => {
+					const target = [...outputXML.getElementsByTagName("Scrivening")].filter(function(scriv) {
+						return scriv.getAttribute("ID") === valArr[0];
+					});
+					target[0].textContent = reader.result;
+					finishedOperations++;
+				};
+				const foundFile = findFileByName(valArr[0] + ".rtf", files);
+				if (foundFile !== null) {reader.readAsText(foundFile);}
 			}
 		}
 	}
-	let serializer = new XMLSerializer();
-	const compileThese = serializer.serializeToString(xmlDoc);
-	console.log(compileThese);
-	submitToWorker(files, compileThese)
+	waitForProcess();
 }
 
-function submitToWorker(files, compileOrder) {
-	chrome.runtime.sendMessage({greeting: "url"}, function(response) {
+function submitToWorker(fileList, compileOrderXML) {
+	chrome.runtime.sendMessage({files:fileList, compileOrder:compileOrderXML}, function(response) {
 	  console.log(response.farewell);
 	});
 }
