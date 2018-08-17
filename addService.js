@@ -13,12 +13,11 @@ function eleBuilder(eleStr, propObj) {
 
 function findFileByName(fileName, fileList) {
 	for (let i=0;i<fileList.length;i++) {
-		console.log(fileList[i].name);
 		if (fileList[i].name === fileName) {
 			return fileList[i];
 		}
 	}
-	console.error("Couldn't find file " + fileName);
+	console.log("Couldn't find file " + fileName);
 	return null;
 }
 
@@ -60,7 +59,7 @@ function generateListing(file, level) {
 	if (file.getAttribute("Type").endsWith("Folder")) {icon = "folder";}
 	let listString = `<span class='checkbox' style="margin-left: ${level.toString()}rem">
 						<label class='styled-checkbox'>
-							<input type='checkbox' class='compileIncludeBox' value = ${ident+"-"+level+"-"+title.replace(" ","_")} ${include?"checked":""}>
+							<input type='checkbox' class='compileIncludeBox' value = ${ident+"-"+level+"-"+title.replace(/ /g,"_")} ${include?"checked":""}>
 							<a></a>
 						</label>
 					</span> <i class="fa fa-${icon}" style="margin-right:.5rem"></i> ${level>0?title:"<b>"+title+"</b>"}`;
@@ -135,8 +134,9 @@ function buildUI() {
 function prepSubmit(scrivx, chapterLevel) {
 
 	function waitForProcess() {
-		if (startedOperations === finishedOperations) {
-			console.log(outputXML);
+		if (startedOperations === finishedOperations && startedOperations + finishedOperations !== 0) {
+			var serializer = new XMLSerializer();
+			submitToWorker(serializer.serializeToString(outputXML));
 		} else {
 			setTimeout(waitForProcess,1000);
 		}
@@ -164,7 +164,7 @@ function prepSubmit(scrivx, chapterLevel) {
 					const target = [...outputXML.getElementsByTagName("Scrivening")].filter(function(scriv) {
 						return scriv.getAttribute("ID") === valArr[0];
 					});
-					target[0].textContent = reader.result;
+					target[0].appendChild(outputXML.createTextNode(reader.result));
 					finishedOperations++;
 				};
 				const foundFile = findFileByName(valArr[0] + ".rtf", files);
@@ -175,10 +175,15 @@ function prepSubmit(scrivx, chapterLevel) {
 	waitForProcess();
 }
 
-function submitToWorker(fileList, compileOrderXML) {
-	chrome.runtime.sendMessage({files:fileList, compileOrder:compileOrderXML}, function(response) {
-	  console.log(response.farewell);
-	});
+function getStoryId() {
+	return window.location.pathname.match(/(?<=\/story\/)\d*/)[0];
+}
+
+function submitToWorker(compiledXML) {
+	chrome.runtime.sendMessage({xmlString:compiledXML, storyID:getStoryId()}, function(response) {
+		console.log(response.farewell);
+	}); 
+
 }
 
 let files;
