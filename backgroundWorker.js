@@ -75,94 +75,165 @@ function rtfToBBCode (rtfIn) {
 
 	const splitRTF = rtfIn.split("\\pgnstarts0", 2)
 
-	/* Inline elements */
+
 	let outputString = ""
-	const rtfGroups = splitRTF[1].match(/(?<!\\){\\f\d.*?}/g);
-	let nest = []
-	for (let i=0;i<rtfGroups.length;i++) {
-		const args = rtfGroups[i].substring(0,rtfGroups[i].indexOf(" "))
-		const contents = rtfGroups[i].substring(rtfGroups[i].indexOf(" ")).replace(/}$/gm,"")
-		let groupString = ""
+	const rtfParagraphs = splitRTF[1].match(/\\par.*$/gm);
 
-		if (args.includes("\\b1") && !nest.includes("bold")) {
-			groupString += "[b]";
-			nest.push("bold");
-		} 
+	let nest = [];
+	for (let p=0;p<rtfParagraphs.length;p++) {
+		let paragraphString = "\n\n"
+		const rtfGroups = rtfParagraphs[p].match(/(?<!\\){\\f\d.*?}/g);
+		
+		if (rtfGroups) {		
+			for (let i=0;i<rtfGroups.length;i++) {
+				const args = rtfGroups[i].substring(0,rtfGroups[i].indexOf(" "))
+				let contents = rtfGroups[i].substring(rtfGroups[i].indexOf(" ")).slice(1).replace(/}$/gm,"")
+				let groupString = "";
 
-		if (args.includes("\\i1") && !nest.includes("italic")) {
-			groupString += "[i]";
-			nest.push("italic");
+				if (nest.length) {
+					let nestLevel = nest.length;
+					while (nestLevel > 0) {
+						if (nest[nestLevel-1] === "bold" && args.includes("\\b0")) {
+							groupString += "[/b]";
+							nest.splice(nestLevel-1, 1);
+							nestLevel--;
+						} else if (nest[nestLevel-1] === "italic" && args.includes("\\i0")) {
+							groupString += "[/i]";
+							nest.splice(nestLevel-1, 1)
+							nestLevel--;
+						} else if (nest[nestLevel-1] === "underline" && !args.includes("\\ul\\ulc0")) {
+							groupString += "[/u]";
+							nest.splice(nestLevel-1, 1)
+							nestLevel--;
+						} else if (nest[nestLevel-1] === "strikethrough" && !args.includes("\\strike\\strikec0")) {
+							groupString += "[/s]";
+							nest.splice(nestLevel-1, 1)
+							nestLevel--;
+						} else if (nest[nestLevel-1] === "smallcaps" && !args.includes("\\scaps")) {
+							groupString += "[/smcaps]";
+							nest.splice(nestLevel-1, 1)
+							nestLevel--;
+						} else if (nest[nestLevel-1] === "superscript" && !args.includes("\\super")) {
+							groupString += "[/sup]";
+							nest.splice(nestLevel-1, 1)
+							nestLevel--;
+						} else if (nest[nestLevel-1] === "subscript" && !args.includes("\\sub")) {
+							groupString += "[/sub]";
+							nest.splice(nestLevel-1, 1)
+							nestLevel--;
+						} else {
+							nestLevel--;
+						}
+						
+					}
+				}
+
+				if (args.includes("\\b1") && !nest.includes("bold")) {
+					groupString += "[b]";
+					nest.push("bold");
+				} 
+
+				if (args.includes("\\i1") && !nest.includes("italic")) {
+					groupString += "[i]";
+					nest.push("italic");
+				}
+
+				if (args.includes("\\ul\\ulc0") && !nest.includes("underline")) {
+					groupString += "[u]";
+					nest.push("underline");
+				}
+
+				if (args.includes("\\ul\\ulc0") && !nest.includes("underline")) {
+					groupString += "[u]";
+					nest.push("underline");
+				}
+
+				if (args.includes("\\strike\\strikec0") && !nest.includes("strikethrough")) {
+					groupString += "[s]";
+					nest.push("strikethrough");
+				}
+
+				if (args.includes("\\scaps") && !nest.includes("smallcaps")) {
+					groupString += "[smcaps]";
+					nest.push("smallcaps");
+				}
+				//Super and Subscript are technically inline - fix later
+				if (args.includes("\\super") && !nest.includes("superscript")) {
+					groupString += "[sup]";
+					nest.push("superscript");
+				}
+
+				if (args.includes("\\sub") && !nest.includes("subscript")) {
+					groupString += "[sub]";
+					nest.push("subscript");
+				}
+
+				/*
+				-colour (have to get colour table first)
+				-size? How do we handle that if we don't know default? Average out the default first? Guess??
+					-Also, don't forget: there are max and min values for size. 32 to 8, looks like. Not sure if that's in pt or not.
+				*/	
+
+				contents = contents.replace(/(?<!\\)\\tab /g, "		");
+				contents = contents.replace(/(?<!\\)\\line /g, "\n");
+				contents = contents.replace(/\\hich\\f\d \\emdash \\loch\\f\d /g,"—")
+				/* -Unicode- */
+				const unicodeChars = contents.match(/\\u\d+\\/g);
+				if (unicodeChars) {
+					contents = contents.replace(/\\loch\\af\d\\hich\\af\d\\dbch\\af\d\\uc1|(?<=\\u\d+\\)'\d\d/g, "");
+					unicodeChars.forEach(uniCode => {
+						contents = contents.replace(uniCode, String.fromCharCode(parseInt(uniCode.slice(2))));
+					});
+				}
+				
+				groupString += contents;
+				paragraphString += groupString;
+			}
 		}
 
 		if (nest.length) {
 			let nestLevel = nest.length;
 			while (nestLevel > 0) {
-				if (nest[nestLevel-1] === "bold" && args.includes("\\b0")) {
-					groupString += "[/b]";
+				if (nest[nestLevel-1] === "bold") {
+					paragraphString += "[/b]";
 					nest.splice(nestLevel-1, 1);
 					nestLevel--;
-				} else if (nest[nestLevel-1] === "italic" && args.includes("\\i0")) {
-					groupString += "[/i]";
+				} else if (nest[nestLevel-1] === "italic") {
+					paragraphString += "[/i]";
+					nest.splice(nestLevel-1, 1)
+					nestLevel--;
+				} else if (nest[nestLevel-1] === "underline") {
+					paragraphString += "[/u]";
+					nest.splice(nestLevel-1, 1)
+					nestLevel--;
+				} else if (nest[nestLevel-1] === "strikethrough") {
+					paragraphString += "[/s]";
+					nest.splice(nestLevel-1, 1)
+					nestLevel--;
+				} else if (nest[nestLevel-1] === "smallcaps") {
+					paragraphString += "[/smcaps]";
+					nest.splice(nestLevel-1, 1)
+					nestLevel--;
+				} else if (nest[nestLevel-1] === "superscript") {
+					paragraphString += "[/sup]";
+					nest.splice(nestLevel-1, 1)
+					nestLevel--;
+				} else if (nest[nestLevel-1] === "subscript") {
+					paragraphString += "[/sub]";
 					nest.splice(nestLevel-1, 1)
 					nestLevel--;
 				} else {
 					nestLevel--;
 				}
-				
 			}
 		}
 
-		groupString += contents;
-		outputString += groupString;
+		outputString += paragraphString;
 	}
-
-	/*if (nest.length) {
-		while (nest.length) {
-			if (nest[nest.length-1] === "bold") {
-				groupString += "[/b]";
-				nest.pop;
-			} else if (nest[nest.length-1] === "italics") {
-				groupString += "[/i]";
-				nest.pop;
-			}
-		}
-	}*/
-
 	return outputString;
 }
 
-/*
-	-- Pseudocode --
-	let outputString = ""
-	get rtf groups
-	for each rtf group
-		let groupContent = content of group
-		let groupString = ""
-		if \b1 (not\\b1) && !bold:
-			groupString += "[b]"
-			bold = true
-		else if bold && \b0 (not\\b0):
-			groupString += "[/b]"
-			bold = false	
-		--repeat for all inline modifiers--
-		groupString += groupContent
-		if bold && end of file
-			groupString += [/b]
-		--repeat for all inline modifiers--
-		outputString += groupString
 
-		--repeat for all inline modifiers--
-		-bold
-		-italic
-		-underline
-		-strikethrough
-		-smallcaps
-		-superscript
-		-subscript
-		-colour (have to get colour table first)
-		-size? How do we handle that if we don't know default? Average out the default first? Guess??
-			-Also, don't forget: there are max and min values for size. 32 to 8, looks like. Not sure if that's in pt or not.
-	*/
 
 chrome.runtime.onMessage.addListener(
 	function(request, sender, sendResponse) {
