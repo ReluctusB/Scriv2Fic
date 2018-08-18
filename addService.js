@@ -168,7 +168,11 @@ function prepSubmit(scrivx, chapterLevel) {
 					finishedOperations++;
 				};
 				const foundFile = findFileByName(valArr[0] + ".rtf", files);
-				if (foundFile !== null) {reader.readAsText(foundFile);}
+				if (foundFile !== null) {
+					reader.readAsText(foundFile);
+				} else {
+					curChapterNode.removeChild(scrivening);
+				}
 			}
 		}
 	}
