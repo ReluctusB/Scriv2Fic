@@ -59,9 +59,7 @@ function convertCompile(xmlString, storyID) {
 		const scrivenings = chapters[i].getElementsByTagName("Scrivening");
 		console.log(chapterTitle);
 		for (let l=0;l<scrivenings.length;l++) {
-			//console.log(scrivenings[l].getAttribute("ID"));
 			let scriveningText = scrivenings[l].textContent;
-			//console.log(scriveningText);
 			chapterBody += rtfToBBCode(scriveningText);
 		}
 		//makeChapter(storyID, chapterTitle, chapterBody);
@@ -72,16 +70,35 @@ function convertCompile(xmlString, storyID) {
 function rtfToBBCode (rtfIn) {
 	/* Table processing will go here eventually*/
 
-
 	const splitRTF = rtfIn.split("\\pgnstarts0", 2)
-
 
 	let outputString = ""
 	const rtfParagraphs = splitRTF[1].match(/\\par.*$/gm);
 
+	let alignment = "left";
 	let nest = [];
 	for (let p=0;p<rtfParagraphs.length;p++) {
 		let paragraphString = "\n\n"
+
+		const alignmentQuantifier = rtfParagraphs[p].match(/\\(q[lcrj]\\)?ltrch\\loch/);
+		if (alignmentQuantifier) {
+			if (!alignmentQuantifier[0].match(/qc|qr/)) {
+				alignment = "left";
+			} else if (alignmentQuantifier[0].includes("\\qc\\")) {
+				alignment = "center";
+			} else if (alignmentQuantifier[0].includes("\\qr\\")) {
+				alignment = "right";
+			}
+		}
+
+		if (alignment === "left") {
+			//pass;
+		} else if (alignment === "center") {
+			paragraphString += "[center]";
+		} else if (alignment === "right") {
+			paragraphString += "[right]";
+		}
+
 		const rtfGroups = rtfParagraphs[p].match(/(?<!\\){\\f\d.*?}/g);
 		
 		if (rtfGroups) {		
@@ -123,8 +140,7 @@ function rtfToBBCode (rtfIn) {
 							nestLevel--;
 						} else {
 							nestLevel--;
-						}
-						
+						}						
 					}
 				}
 
@@ -157,7 +173,7 @@ function rtfToBBCode (rtfIn) {
 					groupString += "[smcaps]";
 					nest.push("smallcaps");
 				}
-				//Super and Subscript are technically inline - fix later
+
 				if (args.includes("\\super") && !nest.includes("superscript")) {
 					groupString += "[sup]";
 					nest.push("superscript");
@@ -228,12 +244,18 @@ function rtfToBBCode (rtfIn) {
 			}
 		}
 
+		if (alignment === "left") {
+			//pass;
+		} else if (alignment === "center") {
+			paragraphString += "[/center]";
+		} else if (alignment === "right") {
+			paragraphString += "[/right]";
+		}
+
 		outputString += paragraphString;
 	}
 	return outputString;
 }
-
-
 
 chrome.runtime.onMessage.addListener(
 	function(request, sender, sendResponse) {
