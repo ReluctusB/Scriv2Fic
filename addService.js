@@ -36,7 +36,7 @@ function processFiles(fileList) {
 	document.getElementById("scrivDir").innerHTML = "";
 	buildDirectory(scrivx);
 	document.getElementById("submitScriv").disabled = false;
-	document.getElementById("submitScriv").addEventListener("click", ()=>{prepSubmit(scrivx, 1);});
+	document.getElementById("submitScriv").addEventListener("click", ()=>{prepSubmit(scrivx, 0);});
 
 }
 
