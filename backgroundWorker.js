@@ -1,5 +1,3 @@
-let authToken = null;
-
 function getToken() {
 	const reDirURL = chrome.identity.getRedirectURL();
 	const clientID = "mGzeZKcuYZZtaOvOW361xC3qlHPnLriw";
@@ -20,22 +18,25 @@ function getToken() {
 		const returnState = redirect_url.match(/(?<=state=).*/)[0];
 		if (returnState && returnState === state) {
 			console.log("Token recieved!");
-			console.log("Token: "+token);
-			console.log("State: "+state);
+			window.localStorage.setItem("scriv2fic_token", token);
+			setTokenDecay()
 			authToken = token;
 		} else if (returnState){
 			console.error("State mismatch in authorization response!");
 		} else {
 			console.error("Authorization response was not recieved or invalid!");
 		}
-	});
-	
+	});	
 }
 
-function makeChapter(storyID, chapterTitle, chapterBody) {
+async function setTokenDecay() {
+	setTimeout(()=>window.localStorage.removeItem("scriv2fic_token"), 600000);
+}
 
-	function createChapter(story, title) {	
-		fetch(apiURL + "stories/"+story+"/chapters" + "?fields[chapter]", {
+function makeChapter(chapterTitle, chapterBody) {
+
+	function createChapter(title) {	
+		fetch(apiURL + "stories/"+storyID+"/chapters" + "?fields[chapter]", {
 			method: "POST",
 			headers: {
 				"Authorization": "Bearer " + authToken,
@@ -54,52 +55,65 @@ function makeChapter(storyID, chapterTitle, chapterBody) {
 			headers: {
 				"Authorization": "Bearer " + authToken,
 			},
-			body: `{
-				"data": {
-					"type": "chapter",
-					"attributes": {
-						"content": "${chapterBody}"
-					}
-				}
-			}`
+			body: `{"data": {"type": "chapter","attributes": {"content": "${chapterBody}"}}}`
 		})
-		.then(response => {response.json().then(respData=>{console.log(respData);console.log("Successfully created chapter " + id);})})
+		.then(response => {response.json().then(respData=>{console.log(respData); queueDown(); console.log("Successfully created chapter " + id);})})
 		.catch(error => console.error(error));
 	}
 
 	const apiURL = "https://www.fimfiction.net/api/v2/";
-	createChapter(storyID, chapterTitle);
-	//console.log(chapterBody);
+	createChapter(chapterTitle);
 }
 
-function convertCompile(xmlString, storyID) {
+function queueDown() {
+	if (queue.length) {
+		makeChapter(queue[0].title, queue[0].body);
+		queue.shift();
+	} else {
+		return;
+	}
+}
+
+async function convertCompile(xmlString) {
 
 	function waitForAuth() {
 		if (authToken) {
-			makeChapter(storyID, chapterTitle, chapterBody);
+			console.log("Authorization granted!");
+			return;
 		} else {
 			console.log("Waiting for authorization");
 			setTimeout(waitForAuth, 2000);
 		}
 	}
 
-	if(!authToken) {getToken();}
+	function queueUp(chapterTitle, chapterBody, i) {
+		queue.push({title:chapterTitle, body:chapterBody});
+		if (queue.length === i) {
+			queueDown();	
+		}
+	}
+	
+	const storedToken = window.localStorage.getItem("scriv2fic_token");
+	if (storedToken) {
+		authToken = storedToken;
+		console.log("Pulling token from storage");
+	} else {
+		getToken();
+		await waitForAuth();
+	}
 
 	const xmlParser = new DOMParser();
 	const compiledXML = xmlParser.parseFromString(xmlString, "text/xml");
 	const chapters = compiledXML.getElementsByTagName("Chapter");
 	for (let i=0;i<chapters.length;i++) {
-		var chapterTitle = chapters[i].getAttribute("Title");
-		var chapterBody = "";
+		let chapterTitle = chapters[i].getAttribute("Title").replace(/_/g, " ");
+		let chapterBody = "";
 		const scrivenings = chapters[i].getElementsByTagName("Scrivening");
 		for (let l=0;l<scrivenings.length;l++) {
 			let scriveningText = scrivenings[l].textContent;
 			chapterBody += rtfToBBCode(scriveningText);
 		}
-
-		waitForAuth();
-		
-		//console.log(chapterBody);
+		queueUp(chapterTitle, chapterBody, chapters.length);
 	}
 }
 
@@ -123,7 +137,7 @@ function rtfToBBCode (rtfIn) {
 	let alignment = "left";
 	let nest = [];
 	for (let p=0;p<rtfParagraphs.length;p++) {
-		let paragraphString = "";
+		let paragraphString = "\\n\\n";
 
 		const alignmentQuantifier = rtfParagraphs[p].match(/\\(q[lcrj]\\)?ltrch\\loch/);
 		if (alignmentQuantifier) {
@@ -229,7 +243,7 @@ function rtfToBBCode (rtfIn) {
 				}
 
 				contents = contents.replace(/(?<!\\)\\tab /g, "		");
-				contents = contents.replace(/(?<!\\)\\line /g, "\n");
+				contents = contents.replace(/(?<!\\)\\line /g, "\\n");
 				contents = contents.replace(/\\hich\\f\d \\emdash \\loch\\f\d /g,"—");
 				/* -Unicode- */
 				const unicodeChars = contents.match(/\\u\d+\\/g);
@@ -295,14 +309,19 @@ function rtfToBBCode (rtfIn) {
 	return outputString;
 }
 
+let authToken = null;
+let queue = [];
+let storyID = 0;
+
+
 chrome.runtime.onMessage.addListener(
 	function(request, sender, sendResponse) {
 	    console.log(sender.tab ?
 	                "from a content script:" + sender.tab.url :
 	                "from the extension");
 	    if (request.xmlString && request.storyID) {
-	    	//getToken();
-		    convertCompile(request.xmlString, request.storyID);
+	    	storyID = request.storyID;
+		    convertCompile(request.xmlString);
 		    sendResponse({farewell: "Document recieved!"});
 		}
 	}
