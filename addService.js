@@ -163,10 +163,16 @@ function prepSubmit(scrivx, chapterLevel) {
 	const includeBoxes = document.getElementsByClassName("compileIncludeBox");
 	let curChapterNode = null;
 	let startedOperations = 0, finishedOperations = 0;
+	let chapterNo = 0
 	for (let i=0;i<includeBoxes.length;i++) {
 		if (includeBoxes[i].checked) {
 			let valArr = includeBoxes[i].value.split("-");
 			if (valArr[1] == chapterLevel) {
+				chapterNo++;
+				if (chapterNo > 1000) {
+					window.alert("Fimfiction does not allow more than 1000 chapters on a story. Check that you have the correct level selected.");
+					return;
+				}
 				curChapterNode = outputXML.createElement("Chapter");
 				curChapterNode.setAttribute("Title",valArr[2]);
 				outputXML.firstChild.appendChild(curChapterNode);				
@@ -208,6 +214,30 @@ function submitToWorker(compiledXML) {
 
 }
 
+function notifyMe() {
+  // Let's check if the browser supports notifications
+  if (!("Notification" in window)) {
+    alert("This browser does not support system notifications");
+  }
+
+  // Let's check whether notification permissions have already been granted
+  else if (Notification.permission === "granted") {
+    // If it's okay let's create a notification
+    var notification = new Notification("Hi there!");
+  }
+
+  // Otherwise, we need to ask the user for permission
+  else if (Notification.permission !== 'denied') {
+    Notification.requestPermission().then(function (permission) {
+      // If the user accepts, let's create a notification
+      if (permission === "granted") {
+        var notification = new Notification("Hi there!");
+      }
+    });
+  }
+}
+
+//notifyMe();
 let files;
 let lowLevel = 0;
 

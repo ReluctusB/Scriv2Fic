@@ -14,7 +14,7 @@
    "permissions": [ 
    	"activeTab", 
    	"identity",
-   	"storage",
+   	"notifications",
    	"https://www.fimfiction.net/*"
    ],
    "version": "1.0"

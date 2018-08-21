@@ -65,21 +65,32 @@ function makeChapter(chapterTitle, chapterBody) {
 	createChapter(chapterTitle);
 }
 
+function notifyCompletion() {
+	let notif = chrome.notifications.create("Completed", {
+		"type": "basic",
+		"title": "Scriv2Fic",
+		"message": "Mission success! Your story has been uploaded to Fimfiction.",
+		"iconUrl":"fimIcon.png"
+	});	
+	chrome.notifications.onClicked.addListener(() => window.open('https://www.fimfiction.net/story/'+storyID, '_blank'));
+}
+
 function queueDown() {
 	if (queue.length) {
 		makeChapter(queue[0].title, queue[0].body);
 		queue.shift();
 	} else {
+		notifyCompletion();
 		return;
 	}
 }
 
-async function convertCompile(xmlString) {
+function convertCompile(xmlString) {
 
 	function waitForAuth() {
 		if (authToken) {
 			console.log("Authorization granted!");
-			return;
+			prepChapters();
 		} else {
 			console.log("Waiting for authorization");
 			setTimeout(waitForAuth, 2000);
@@ -92,28 +103,31 @@ async function convertCompile(xmlString) {
 			queueDown();	
 		}
 	}
+
+	function prepChapters() {
+		const xmlParser = new DOMParser();
+		const compiledXML = xmlParser.parseFromString(xmlString, "text/xml");
+		const chapters = compiledXML.getElementsByTagName("Chapter");
+		for (let i=0;i<chapters.length;i++) {
+			let chapterTitle = chapters[i].getAttribute("Title").replace(/_/g, " ");
+			let chapterBody = "";
+			const scrivenings = chapters[i].getElementsByTagName("Scrivening");
+			for (let l=0;l<scrivenings.length;l++) {
+				let scriveningText = scrivenings[l].textContent;
+				chapterBody += rtfToBBCode(scriveningText);
+			}
+			queueUp(chapterTitle, chapterBody, chapters.length);
+		}
+	}
 	
 	const storedToken = window.localStorage.getItem("scriv2fic_token");
 	if (storedToken) {
 		authToken = storedToken;
 		console.log("Pulling token from storage");
+		prepChapters();
 	} else {
 		getToken();
-		await waitForAuth();
-	}
-
-	const xmlParser = new DOMParser();
-	const compiledXML = xmlParser.parseFromString(xmlString, "text/xml");
-	const chapters = compiledXML.getElementsByTagName("Chapter");
-	for (let i=0;i<chapters.length;i++) {
-		let chapterTitle = chapters[i].getAttribute("Title").replace(/_/g, " ");
-		let chapterBody = "";
-		const scrivenings = chapters[i].getElementsByTagName("Scrivening");
-		for (let l=0;l<scrivenings.length;l++) {
-			let scriveningText = scrivenings[l].textContent;
-			chapterBody += rtfToBBCode(scriveningText);
-		}
-		queueUp(chapterTitle, chapterBody, chapters.length);
+		waitForAuth();
 	}
 }
 
@@ -312,7 +326,6 @@ function rtfToBBCode (rtfIn) {
 let authToken = null;
 let queue = [];
 let storyID = 0;
-
 
 chrome.runtime.onMessage.addListener(
 	function(request, sender, sendResponse) {
