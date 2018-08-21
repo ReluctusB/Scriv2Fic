@@ -36,7 +36,9 @@ function processFiles(fileList) {
 	document.getElementById("scrivDir").innerHTML = "";
 	buildDirectory(scrivx);
 	document.getElementById("submitScriv").disabled = false;
-	document.getElementById("submitScriv").addEventListener("click", ()=>{prepSubmit(scrivx, 1);});
+	document.getElementById("submitScriv").addEventListener("click", ()=>{
+		prepSubmit(scrivx, parseInt(document.getElementById("breakSelector").value));
+	});
 
 }
 
@@ -66,7 +68,14 @@ function generateListing(file, level) {
 	return eleBuilder("LI",{HTML:listString});
 }
 
+function setLevelSelector() {
+	for (let i=0;i<=lowLevel;i++) {
+		document.getElementById("breakSelector").innerHTML += `<option value="${i}"">${i}</option>`
+	}
+}
+
 function buildHierarchy(fileList, level) {
+	if (level > lowLevel) {lowLevel = level;}
 	for (let i=0;i<fileList.length;i++) {
 		document.getElementById("scrivDir").appendChild(generateListing(fileList[i], level));
 		let kids = fileList[i].getElementsByTagName("Children")[0];
@@ -75,6 +84,7 @@ function buildHierarchy(fileList, level) {
 }
 
 function buildDirectory(scrivx) {
+	document.getElementById("breakSelector").innerHTML = 0;
 	const reader = new FileReader();
 	reader.readAsText(scrivx, "UTF-8");
 	reader.onload = function (evt) {
@@ -84,10 +94,11 @@ function buildDirectory(scrivx) {
 		document.getElementById("scrivTitle").innerText = scrivx.name.replace(".scrivx","");
 		const topLevelFiles = xmlDoc.querySelectorAll("Binder > BinderItem[Type=DraftFolder]");
 		buildHierarchy(topLevelFiles, 0);
+		setLevelSelector();
 	};
 }
 
-const stringUI = `
+const stringUI = `<main>
 	<div class='search-bar'>
 		<div class="flex" style="margin-bottom:0.5rem;"></div>
 		<div class='styled-input'></div>
@@ -96,9 +107,15 @@ const stringUI = `
 	<div class="files-container" style=overflow:auto;">
 		<ul class="files" id="scrivDir"></ul>
 	</div>
+	<div class="footer-bar styled-input">
+		<label for="breakSelector">Divide chapters on level:</label>
+		<select id="breakSelector" style="height: 1.5rem;padding: 0;min-width: 2.5rem;margin-left: .2rem;flex:0;webkit-flex:0;">
+		</select>
+	</div>
 	<div class="footer-bar">
 		<button class="styled_button" disabled="false" id="submitScriv">Import Project</button>
 	</div>
+	</main>
 	`;
 
 function goBack() {
@@ -141,6 +158,7 @@ function prepSubmit(scrivx, chapterLevel) {
 			setTimeout(waitForProcess,1000);
 		}
 	}
+
 	let outputXML = document.implementation.createDocument(null, "Story");
 	const includeBoxes = document.getElementsByClassName("compileIncludeBox");
 	let curChapterNode = null;
@@ -191,6 +209,7 @@ function submitToWorker(compiledXML) {
 }
 
 let files;
+let lowLevel = 0;
 
 if (document.getElementsByClassName("fa-upload")[0]) {
 	document.querySelector("a[data-click='importChapter']").addEventListener("click", addService);
