@@ -261,16 +261,19 @@ function rtfToBBCode (rtfIn) {
 				/* -Unicode- */
 				const unicodeChars = contents.match(/\\u\d+\\/g);
 				if (unicodeChars) {
-					contents = contents.replace(/\loch\\af\d\\hich\\af\d\\dbch\\af\d\\uc1|(?<=\\u\d\d\d\d\\)'\d\d/g, "");
+					contents = contents.replace(/\\loch\\af\d\\hich\\af\d\\dbch\\af\d\\uc1|(?<=\\u\d\d\d\d\\)'\d\d/g, "");
 					unicodeChars.forEach(uniCode => {
 						contents = contents.replace(uniCode, String.fromCharCode(parseInt(uniCode.slice(2))));
+
 					});
 				}
+				contents = contents.replace(/\\hich\\f\d \\emdash \\loch\\f\d /g,"—");
+
 				contents = contents.replace(/\\(\\\\)*/g, `\\\\`);
 				contents = contents.replace(/"/g, `\\"`);				
 				contents = contents.replace(/(?<!\\)\\tab /g, "\\t");
 				contents = contents.replace(/(?<!\\)\\line /g, "\\n");
-				contents = contents.replace(/\\hich\\f\d \\emdash \\loch\\f\d /g,"—");
+
 				
 				groupString += contents;
 				paragraphString += groupString;
