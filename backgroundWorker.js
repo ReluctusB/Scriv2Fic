@@ -63,6 +63,7 @@ function makeChapter(chapterTitle, chapterBody) {
 
 	const apiURL = "https://www.fimfiction.net/api/v2/";
 	createChapter(chapterTitle);
+	//console.log(chapterBody);
 }
 
 function notifyCompletion() {
@@ -85,7 +86,7 @@ function queueDown() {
 	}
 }
 
-function convertCompile(xmlString) {
+function convertCompile(xmlString, dividerString) {
 
 	function waitForAuth() {
 		if (authToken) {
@@ -115,6 +116,7 @@ function convertCompile(xmlString) {
 			for (let l=0;l<scrivenings.length;l++) {
 				let scriveningText = scrivenings[l].textContent;
 				chapterBody += rtfToBBCode(scriveningText);
+				if (l !== scrivenings.length - 1) {chapterBody += dividerString}
 			}
 			queueUp(chapterTitle, chapterBody, chapters.length);
 		}
@@ -255,18 +257,20 @@ function rtfToBBCode (rtfIn) {
 					groupString += "[sub]";
 					nest.push("subscript");
 				}
-
-				contents = contents.replace(/(?<!\\)\\tab /g, "		");
-				contents = contents.replace(/(?<!\\)\\line /g, "\\n");
-				contents = contents.replace(/\\hich\\f\d \\emdash \\loch\\f\d /g,"—");
+				
 				/* -Unicode- */
 				const unicodeChars = contents.match(/\\u\d+\\/g);
 				if (unicodeChars) {
-					contents = contents.replace(/\\loch\\af\d\\hich\\af\d\\dbch\\af\d\\uc1|(?<=\\u\d+\\)'\d\d/g, "");
+					contents = contents.replace(/\loch\\af\d\\hich\\af\d\\dbch\\af\d\\uc1|(?<=\\u\d\d\d\d\\)'\d\d/g, "");
 					unicodeChars.forEach(uniCode => {
 						contents = contents.replace(uniCode, String.fromCharCode(parseInt(uniCode.slice(2))));
 					});
 				}
+				contents = contents.replace(/\\(\\\\)*/g, `\\\\`);
+				contents = contents.replace(/"/g, `\\"`);				
+				contents = contents.replace(/(?<!\\)\\tab /g, "\\t");
+				contents = contents.replace(/(?<!\\)\\line /g, "\\n");
+				contents = contents.replace(/\\hich\\f\d \\emdash \\loch\\f\d /g,"—");
 				
 				groupString += contents;
 				paragraphString += groupString;
@@ -334,7 +338,7 @@ chrome.runtime.onMessage.addListener(
 	                "from the extension");
 	    if (request.xmlString && request.storyID) {
 	    	storyID = request.storyID;
-		    convertCompile(request.xmlString);
+		    convertCompile(request.xmlString, request.divider);
 		    sendResponse({farewell: "Document recieved!"});
 		}
 	}

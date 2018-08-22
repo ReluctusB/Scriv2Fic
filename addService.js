@@ -23,7 +23,7 @@ function findFileByName(fileName, fileList) {
 
 function addService() {
 	if (document.getElementsByClassName("services")[0]) {
-		document.querySelector("div[data-element='serviceSelector']").insertAdjacentHTML("afterBegin","<ul class='services'><li id='s2f'>Scriv2Fic (Local)</li></ul>");
+		document.querySelector("div[data-element='serviceSelector'] > main").insertAdjacentHTML("afterBegin","<ul class='services' style='flex:0;-webkit-flex:0;'><li id='s2f'>Scriv2Fic (Local)</li></ul>");
 		document.getElementById("s2f").addEventListener("click", buildUI);
 	} else {
 		setTimeout(addService,500);
@@ -52,22 +52,6 @@ function findScrivx(fileList) {
 	return;
 }
 
-function generateListing(file, level) {
-	let titleEle = file.getElementsByTagName("Title")[0].childNodes[0];
-	const title = titleEle ? titleEle.nodeValue : "Untitled";
-	const ident = file.getAttribute("Type") != "Folder" ? file.getAttribute("ID") : "Folder";
-	let icon = "file-text";
-	let include = file.getElementsByTagName("IncludeInCompile")[0] ? true : false;
-	if (file.getAttribute("Type").endsWith("Folder")) {icon = "folder";}
-	let listString = `<span class='checkbox' style="margin-left: ${level.toString()}rem">
-						<label class='styled-checkbox'>
-							<input type='checkbox' class='compileIncludeBox' value = ${ident+"-"+level+"-"+title.replace(/ /g,"_")} ${include?"checked":""}>
-							<a></a>
-						</label>
-					</span> <i class="fa fa-${icon}" style="margin-right:.5rem"></i> ${level>0?title:"<b>"+title+"</b>"}`;
-	return eleBuilder("LI",{HTML:listString});
-}
-
 function setLevelSelector() {
 	for (let i=0;i<=lowLevel;i++) {
 		document.getElementById("breakSelector").innerHTML += `<option value="${i}"">${i}</option>`
@@ -75,9 +59,43 @@ function setLevelSelector() {
 }
 
 function buildHierarchy(fileList, level) {
+
+	function generateListing(file, level) {
+		let titleEle = file.getElementsByTagName("Title")[0].childNodes[0];
+		if (titleEle) {
+			title = titleEle.nodeValue;
+		} else {
+			title = "Untitled-" + untitledNo;
+			untitledNo++;
+		}
+		const ident = file.getAttribute("Type") != "Folder" ? file.getAttribute("ID") : "Folder";
+		let icon = "file-text";
+		let hierDisplay = level>1 ? "none" : "flex";
+		let include = file.getElementsByTagName("IncludeInCompile")[0] ? true : false;
+		let hasChildren = ""
+		if (file.getElementsByTagName("Children")[0]) {
+			if (level !== 0) {
+				hasChildren = "<i class='fa fa-angle-right' style='margin-left:1rem;font-size:1.3rem;'></i>"
+			} else {
+				hasChildren = "<i class='fa fa-angle-down' style='margin-left:1rem;font-size:1.3rem;'></i>"
+			}
+		}
+		if (file.getAttribute("Type").endsWith("Folder")) {icon = "folder";}
+		let listString = `<span class='checkbox' style="margin-left: ${(level*2).toString()}rem">
+							<label class='styled-checkbox'>
+								<input type='checkbox' class='compileIncludeBox' value = ${ident+"|"+level+"|"+title.replace(/ /g,"_")} ${include?"checked":""}>
+								<a></a>
+							</label>
+						</span> <i class="fa fa-${icon}" style="margin-right:.5rem"></i> ${title}<b>${hasChildren}</b>`;
+		return eleBuilder("LI",{HTML:listString, class:title, value:level, style:"display:"+hierDisplay});
+	}
+
 	if (level > lowLevel) {lowLevel = level;}
+	let untitledNo = 1;
 	for (let i=0;i<fileList.length;i++) {
-		document.getElementById("scrivDir").appendChild(generateListing(fileList[i], level));
+		const listing = generateListing(fileList[i], level);
+		listing.addEventListener("click", function() {showHideChildren(this);});
+		document.getElementById("scrivDir").appendChild(listing);
 		let kids = fileList[i].getElementsByTagName("Children")[0];
 		if (kids) {buildHierarchy(kids.children, level + 1);}		
 	}
@@ -94,29 +112,49 @@ function buildDirectory(scrivx) {
 		document.getElementById("scrivTitle").innerText = scrivx.name.replace(".scrivx","");
 		const topLevelFiles = xmlDoc.querySelectorAll("Binder > BinderItem[Type=DraftFolder]");
 		buildHierarchy(topLevelFiles, 0);
+		const includeBoxes = document.getElementsByClassName("compileIncludeBox");
+		for (let i=0;i<includeBoxes.length;i++) {includeBoxes[i].addEventListener("change", function() {checkChildren(this);});}
 		setLevelSelector();
 	};
 }
 
-const stringUI = `<main>
-	<div class='search-bar'>
-		<div class="flex" style="margin-bottom:0.5rem;"></div>
-		<div class='styled-input'></div>
-	</div>
-	<div id="scrivTitle" style="font-weight:bold; font-size:1.1rem;"></div>
-	<div class="files-container" style=overflow:auto;">
-		<ul class="files" id="scrivDir"></ul>
-	</div>
-	<div class="footer-bar styled-input">
-		<label for="breakSelector">Divide chapters on level:</label>
-		<select id="breakSelector" style="height: 1.5rem;padding: 0;min-width: 2.5rem;margin-left: .2rem;flex:0;webkit-flex:0;">
-		</select>
-	</div>
-	<div class="footer-bar">
-		<button class="styled_button" disabled="false" id="submitScriv">Import Project</button>
-	</div>
-	</main>
-	`;
+function checkChildren(me) {
+	const includeBoxes = document.getElementsByClassName("compileIncludeBox");
+	const thisBox = me.value.split("|");
+	const thisIndex = [...includeBoxes].indexOf(me);
+	for (let i=thisIndex+1;i<includeBoxes.length;i++) {
+		if (parseInt(includeBoxes[i].value.split("|")[1]) > parseInt(thisBox[1])) {
+			includeBoxes[i].checked = me.checked;
+		} else {
+			return;
+		}
+	}
+}
+
+function showHideChildren(me) {
+	const fileItems = document.querySelectorAll("#scrivDir > li");
+	const thisLevel = parseInt(me.value);
+	const thisIndex = [...fileItems].indexOf(me);
+	const dropIcon = me.getElementsByTagName("I")[1];
+	if (dropIcon){
+		if (dropIcon.className === "fa fa-angle-right") {
+			dropIcon.className = "fa fa-angle-down";
+		} else {
+			dropIcon.className = "fa fa-angle-right";
+		}
+	}
+	for (let i=thisIndex+1;i<fileItems.length;i++) {
+		if (parseInt(fileItems[i].value) > thisLevel) {
+			if (fileItems[i].style.display !== "none") {
+				fileItems[i].style.display = "none";
+			} else if (fileItems[i].style.display === "none" && parseInt(fileItems[i].value) === thisLevel + 1){
+				fileItems[i].style.display = "flex";
+			}		
+		} else {
+			return;
+		}
+	}
+}
 
 function goBack() {
 	document.querySelector("div[data-element='serviceSelector']").className = "";	
@@ -127,8 +165,34 @@ function goBack() {
 function buildUI() {
 	const importPopup = document.getElementsByClassName("import-files-popup")[0];
 	if (!document.getElementById("scrivSelector")) {
+		const stringUI = `
+			<main>
+				<div class='search-bar'>
+					<div class="flex" style="margin-bottom:0.5rem;"></div>
+					<div class='styled-input'></div>
+					<div id="scrivTitle" style="font-weight:bold; padding:.5rem 0 0 0;"></div>
+				</div>	
+				<div class="files-container" style=overflow:auto;">
+					<ul class="files" id="scrivDir"></ul>
+				</div>
+				<div class="footer-bar styled-input">
+					<label for="breakSelector">Divide chapters on level: </label>
+					<select id="breakSelector" style="height: 1.5rem;padding: 0;min-width: 2.5rem;margin-left: .2rem;flex:0;webkit-flex:0;">
+					</select>
+				</div>
+				<div class="footer-bar styled-input">
+					<label for="dividerDatalist">Divide adjacent documents using: </label>
+					<input list="dividerDatalist" id="dividerInput" value="[hr]" style="height: 1.5rem;padding: 0 0 0 5px;min-width: 10rem;margin-left: .2rem;flex:0;webkit-flex:0;">
+					<datalist id="dividerDatalist">
+						<option value="[hr]">
+						<option value="\\n">
+					</datalist>
+				</div>
+				<div class="footer-bar">
+					<button class="styled_button" disabled="false" id="submitScriv">Import Project</button>
+				</div>
+			</main>`;
 		const scrivSelector = eleBuilder("DIV", {HTML:stringUI, id:"scrivSelector"});
-		scrivSelector.innerHTML = stringUI;
 		const fileInput = eleBuilder("INPUT",{id:"scrivDrop", type:"file"});
 		fileInput.webkitdirectory = "true";
 		fileInput.accept = ".scriv";
@@ -146,7 +210,7 @@ function buildUI() {
 	document.getElementById("scrivSelector").className = "";
 }
 
-//ID, level, title
+//[ID, level, title]
 
 function prepSubmit(scrivx, chapterLevel) {
 
@@ -166,7 +230,7 @@ function prepSubmit(scrivx, chapterLevel) {
 	let chapterNo = 0
 	for (let i=0;i<includeBoxes.length;i++) {
 		if (includeBoxes[i].checked) {
-			let valArr = includeBoxes[i].value.split("-");
+			let valArr = includeBoxes[i].value.split("|");
 			if (valArr[1] == chapterLevel) {
 				chapterNo++;
 				if (chapterNo > 1000) {
@@ -207,37 +271,17 @@ function getStoryId() {
 	return window.location.pathname.match(/(?<=\/story\/)\d*/)[0];
 }
 
-function submitToWorker(compiledXML) {
-	chrome.runtime.sendMessage({xmlString:compiledXML, storyID:getStoryId()}, function(response) {
+function submitToWorker(compiledXML,) {
+	chrome.runtime.sendMessage({
+		xmlString:compiledXML, 
+		storyID:getStoryId(), 
+		divider: document.getElementById("dividerInput").value
+	}, function(response) {
 		console.log(response.farewell);
 	}); 
 
 }
 
-function notifyMe() {
-  // Let's check if the browser supports notifications
-  if (!("Notification" in window)) {
-    alert("This browser does not support system notifications");
-  }
-
-  // Let's check whether notification permissions have already been granted
-  else if (Notification.permission === "granted") {
-    // If it's okay let's create a notification
-    var notification = new Notification("Hi there!");
-  }
-
-  // Otherwise, we need to ask the user for permission
-  else if (Notification.permission !== 'denied') {
-    Notification.requestPermission().then(function (permission) {
-      // If the user accepts, let's create a notification
-      if (permission === "granted") {
-        var notification = new Notification("Hi there!");
-      }
-    });
-  }
-}
-
-//notifyMe();
 let files;
 let lowLevel = 0;
 
