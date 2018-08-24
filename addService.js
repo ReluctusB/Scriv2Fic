@@ -1,3 +1,7 @@
+/* --Globals-- */
+let files;
+let lowLevel = 0;
+
 function eleBuilder(eleStr, propObj) {
     const ele = document.createElement(eleStr);
     if (propObj.class) {ele.className = propObj.class;}
@@ -70,7 +74,7 @@ function buildHierarchy(fileList, level) {
 		}
 		const ident = file.getAttribute("Type") != "Folder" ? file.getAttribute("ID") : "Folder";
 		let icon = "file-text";
-		let hierDisplay = level>1 ? "none" : "flex";
+		let hierDisplay = level > 1 ? "none" : "flex";
 		let include = file.getElementsByTagName("IncludeInCompile")[0] ? true : false;
 		let hasChildren = ""
 		if (file.getElementsByTagName("Children")[0]) {
@@ -279,11 +283,7 @@ function submitToWorker(compiledXML,) {
 	}, function(response) {
 		console.log(response.farewell);
 	}); 
-
 }
-
-let files;
-let lowLevel = 0;
 
 if (document.getElementsByClassName("fa-upload")[0]) {
 	document.querySelector("a[data-click='importChapter']").addEventListener("click", addService);

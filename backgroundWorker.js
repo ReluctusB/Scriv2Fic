@@ -1,15 +1,38 @@
-function getToken() {
+/* --Globals-- */
+let authToken = null;
+let queue = [];
+let storyID = 0;
+let requestNo = 0;
+
+function getToken(callback) {
+
+	function waitForAuth(retries) {
+		if (authToken) {
+			callback();
+		} else if (retries >= 30) {
+			notify("Error: Couldn't get an authorization token! Request timed out.", "error", true);
+		} else {
+			console.log("Waiting for authorization...");
+			setTimeout(()=>waitForAuth(retries+1), 2000);
+		}
+	}
+
+	function setTokenDecay() {
+		setTimeout(()=>window.localStorage.removeItem("scriv2fic_token"), 600000);
+	}
+
 	const reDirURL = chrome.identity.getRedirectURL();
 	const clientID = "mGzeZKcuYZZtaOvOW361xC3qlHPnLriw";
 	const rArray = new Uint32Array(8);
 	const state = window.crypto.getRandomValues(rArray).join("");
-	console.log("Getting token!");
+	console.log("Getting token...");
 	let authURL = "https://www.fimfiction.net/authorize-app?";
 	authURL += "client_id=" + clientID;
 	authURL += "&response_type=token";
 	authURL += "&scope=read_stories+write_stories";
 	authURL += "&state=" + state;
 	authURL += "&redirect_uri=" + reDirURL;
+
 	chrome.identity.launchWebAuthFlow({
 		url: authURL,
 		interactive: true
@@ -19,21 +42,47 @@ function getToken() {
 		if (returnState && returnState === state) {
 			console.log("Token recieved!");
 			window.localStorage.setItem("scriv2fic_token", token);
-			setTokenDecay()
+			setTokenDecay();
 			authToken = token;
 		} else if (returnState){
 			console.error("State mismatch in authorization response!");
 		} else {
-			console.error("Authorization response was not recieved or invalid!");
+			console.error("Authorization response was invalid!");
 		}
-	});	
-}
+	});
 
-async function setTokenDecay() {
-	setTimeout(()=>window.localStorage.removeItem("scriv2fic_token"), 600000);
+	waitForAuth(0);
 }
 
 function makeChapter(chapterTitle, chapterBody) {
+
+	function handleErrors(errorData) {
+		console.error(errorData.code + ": " + errorData.title + ":\nDetails: " + errorData.detail);
+		switch(errorData.code) {
+			case 4040: //Resource unavailable
+				notify("Error: 404! Fimfiction may be down. Try again later!", "error", true);
+				break;
+			case 4001: //Bad JSON
+				notify(`Error: Invalid JSON! There's something about your chapter (${chapterTitle}) that we just didn't like. Please send an error report to user RB_ with your chapter's text and title.`, "error", true);
+				break;
+			case 4030: //Invalid permission (probably switched user)
+				notify("Error: Invalid permissions! If you have switched to a different account, please go back to that account and delete the extra session from your session list before trying again.", "error", true);
+				break;
+			case 4032: //Invalid token
+				console.log("Stored token has expired but not decayed. Fetching a new one.");
+				authToken = null;
+				getToken(()=>makeChapter(chapterTitle, chapterBody));
+				break;
+			case 4290: //Rate limited
+				notify("Error: Rate limited! We made too many requests too quickly. This shouldn't happen, so please contact user RB_.", "error", true);
+				break;
+			case 5000: //Internal server error
+				notify("Error: Internal Error! Something went wrong on Fimfiction's end. Try again, and if the problem persists, please contact user RB_.", "error", true);
+				break;
+			default:
+				notify(`Error: Critical faliure! Something has gone horribly wrong. Please contact user RB_ and give him this: "${errorData.code}: ${errorData.detail}"`, "error", true);
+		}
+	}
 
 	function createChapter(title) {	
 		fetch(apiURL + "stories/"+storyID+"/chapters" + "?fields[chapter]", {
@@ -44,7 +93,14 @@ function makeChapter(chapterTitle, chapterBody) {
 			body: `{"data": {"type": "chapter","attributes": {"title": "${title}"}}}`
 		})
 		.then(response => {
-			response.json().then(respData=>{console.log(respData);writeToChapter(respData.data.id);});
+			response.json().then(respData=>{
+				if (respData.errors) {
+					handleErrors(respData.errors[0]);
+				} else {
+					requestNo++;
+					setTimeout(()=>writeToChapter(respData.data.id), Math.pow(1.00910841119455, requestNo));
+				}
+			});
 		})
 		.catch(error => {console.error(error);});
 	}
@@ -57,21 +113,31 @@ function makeChapter(chapterTitle, chapterBody) {
 			},
 			body: `{"data": {"type": "chapter","attributes": {"content": "${chapterBody}"}}}`
 		})
-		.then(response => {response.json().then(respData=>{console.log(respData); queueDown(); console.log("Successfully created chapter " + id);})})
+		.then(response => {response.json().then(respData=>{
+			if (respData.errors) {
+				handleErrors(respData.errors[0]);
+			} else {
+				queueDown(); 
+				console.log("Successfully created chapter " + id);
+			}
+		});})
+		
 		.catch(error => console.error(error));
 	}
 
 	const apiURL = "https://www.fimfiction.net/api/v2/";
-	createChapter(chapterTitle);
+	requestNo++;
+	setTimeout(()=>createChapter(chapterTitle), Math.pow(1.00910841119455, requestNo));
 	//console.log(chapterBody);
 }
 
-function notifyCompletion() {
-	let notif = chrome.notifications.create("Completed", {
+function notify(message, id, persist = false) {
+	let notif = chrome.notifications.create(id, {
 		"type": "basic",
 		"title": "Scriv2Fic",
-		"message": "Mission success! Your story has been uploaded to Fimfiction.",
-		"iconUrl":"fimIcon.png"
+		"message": message,
+		"iconUrl":"fimIcon.png",
+		"requireInteraction": persist
 	});	
 	chrome.notifications.onClicked.addListener(() => window.open('https://www.fimfiction.net/story/'+storyID, '_blank'));
 }
@@ -81,22 +147,12 @@ function queueDown() {
 		makeChapter(queue[0].title, queue[0].body);
 		queue.shift();
 	} else {
-		notifyCompletion();
+		notify("Mission success! Your story has been uploaded to Fimfiction.", "Completed");
 		return;
 	}
 }
 
 function convertCompile(xmlString, dividerString) {
-
-	function waitForAuth() {
-		if (authToken) {
-			console.log("Authorization granted!");
-			prepChapters();
-		} else {
-			console.log("Waiting for authorization");
-			setTimeout(waitForAuth, 2000);
-		}
-	}
 
 	function queueUp(chapterTitle, chapterBody, i) {
 		queue.push({title:chapterTitle, body:chapterBody});
@@ -128,8 +184,7 @@ function convertCompile(xmlString, dividerString) {
 		console.log("Pulling token from storage");
 		prepChapters();
 	} else {
-		getToken();
-		waitForAuth();
+		getToken(prepChapters);
 	}
 }
 
@@ -261,20 +316,21 @@ function rtfToBBCode (rtfIn) {
 				/* -Unicode- */
 				const unicodeChars = contents.match(/\\u\d+\\/g);
 				if (unicodeChars) {
-					contents = contents.replace(/\\loch\\af\d\\hich\\af\d\\dbch\\af\d\\uc1|(?<=\\u\d\d\d\d\\)'\d\d/g, "");
+					contents = contents.replace(/\\loch\\af\d\\hich\\af\d\\dbch\\af\d\\uc1|(?<=\\u\d\d\d\d\\)'\w\w/g, "");
 					unicodeChars.forEach(uniCode => {
 						contents = contents.replace(uniCode, String.fromCharCode(parseInt(uniCode.slice(2))));
-
 					});
 				}
-				contents = contents.replace(/\\hich\\f\d \\emdash \\loch\\f\d /g,"—");
 
-				contents = contents.replace(/\\(\\\\)*/g, `\\\\`);
-				contents = contents.replace(/"/g, `\\"`);				
+				contents = contents.replace(/\\hich\\f\d \\emdash \\loch\\f\d /g,"—");
 				contents = contents.replace(/(?<!\\)\\tab /g, "\\t");
 				contents = contents.replace(/(?<!\\)\\line /g, "\\n");
 
-				
+				// Make me ignore escape chars!
+				contents = contents.replace(/\\(\\\\)*/g, `\\\\`);
+
+				contents = contents.replace(/"/g, `\\"`);				
+
 				groupString += contents;
 				paragraphString += groupString;
 			}
@@ -329,10 +385,6 @@ function rtfToBBCode (rtfIn) {
 	}
 	return outputString;
 }
-
-let authToken = null;
-let queue = [];
-let storyID = 0;
 
 chrome.runtime.onMessage.addListener(
 	function(request, sender, sendResponse) {
