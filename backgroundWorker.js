@@ -63,7 +63,7 @@ function makeChapter(chapterTitle, chapterBody) {
 				notify("Error: 404! Fimfiction may be down. Try again later!", "error", true);
 				break;
 			case 4001: //Bad JSON
-				notify(`Error: Invalid JSON! There's something about your chapter (${chapterTitle}) that we just didn't like. Please send an error report to user RB_ with your chapter's text and title.`, "error", true);
+				notify(`Error: Invalid JSON! There's something about your chapter "${chapterTitle}" that we just didn't like. Please send an error report to user RB_ with your chapter's text and title.`, "error", true);
 				break;
 			case 4030: //Invalid permission (probably switched user)
 				notify("Error: Invalid permissions! If you have switched to a different account, please go back to that account and delete the extra session from your session list before trying again.", "error", true);
@@ -98,7 +98,7 @@ function makeChapter(chapterTitle, chapterBody) {
 					handleErrors(respData.errors[0]);
 				} else {
 					requestNo++;
-					setTimeout(()=>writeToChapter(respData.data.id), Math.pow(1.00910841119455, requestNo));
+					setTimeout(()=>writeToChapter(respData.data.id), Math.pow(1.00936093670273, requestNo)+500);
 				}
 			});
 		})
@@ -127,7 +127,7 @@ function makeChapter(chapterTitle, chapterBody) {
 
 	const apiURL = "https://www.fimfiction.net/api/v2/";
 	requestNo++;
-	setTimeout(()=>createChapter(chapterTitle), Math.pow(1.00910841119455, requestNo));
+	setTimeout(()=>createChapter(chapterTitle), Math.pow(1.00936093670273, requestNo)+500);
 	//console.log(chapterBody);
 }
 
@@ -148,6 +148,8 @@ function queueDown() {
 		queue.shift();
 	} else {
 		notify("Mission success! Your story has been uploaded to Fimfiction.", "Completed");
+		const storyURL = "https://www.fimfiction.net/story/" + storyID + "/*"
+		chrome.tabs.query({url:storyURL}, tab => {if (tab) {chrome.tabs.reload(tab[0].id);}})
 		return;
 	}
 }
@@ -394,7 +396,12 @@ chrome.runtime.onMessage.addListener(
 	    if (request.xmlString && request.storyID) {
 	    	storyID = request.storyID;
 		    convertCompile(request.xmlString, request.divider);
-		    sendResponse({farewell: "Document recieved!"});
+		    sendResponse({
+		    	farewell: "<h1 style='font-size:2rem;font-weight:bold;'>Spike, take a letter!</h1>"
+		    	+"<span style='font-weight:bold;'>Your document is now being processed into BBCode and uploaded.</span><br><br>"
+		    	+"This may take a little while, but don't worry! "
+		    	+"You can safely navigate away from this page, and we'll alert you when we're done."
+		    });
 		}
 	}
 );

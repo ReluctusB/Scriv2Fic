@@ -15,6 +15,7 @@
    	"activeTab", 
    	"identity",
    	"notifications",
+   	"tabs",
    	"https://www.fimfiction.net/*"
    ],
    "version": "1.0"

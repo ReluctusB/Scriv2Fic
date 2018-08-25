@@ -227,6 +227,7 @@ function prepSubmit(scrivx, chapterLevel) {
 		}
 	}
 
+	processingUI();
 	let outputXML = document.implementation.createDocument(null, "Story");
 	const includeBoxes = document.getElementsByClassName("compileIncludeBox");
 	let curChapterNode = null;
@@ -275,13 +276,29 @@ function getStoryId() {
 	return window.location.pathname.match(/(?<=\/story\/)\d*/)[0];
 }
 
-function submitToWorker(compiledXML,) {
+function processingUI() {
+	const submitButton = document.getElementById("submitScriv");
+	submitButton.disabled = true;
+	submitButton.innerText = "Processing...";
+}
+
+function displayMessage(message) {
+	dispArea = document.querySelector("#scrivSelector > main");
+	dispStr = `
+	<main style="display:flex;justify-content:center;align-items:center;">
+			<div style="text-align:center;padding:5%;">${message}</div>
+	</main>
+	`
+	dispArea.innerHTML = dispStr;
+}
+
+function submitToWorker(compiledXML) {
 	chrome.runtime.sendMessage({
 		xmlString:compiledXML, 
 		storyID:getStoryId(), 
 		divider: document.getElementById("dividerInput").value
 	}, function(response) {
-		console.log(response.farewell);
+		displayMessage(response.farewell);
 	}); 
 }
 
