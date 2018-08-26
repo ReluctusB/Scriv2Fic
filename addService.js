@@ -2,6 +2,7 @@
 let files;
 let lowLevel = 0;
 
+/* Builds HTML elements according to a properties object (propObj) */
 function eleBuilder(eleStr, propObj) {
     const ele = document.createElement(eleStr);
     if (propObj.class) {ele.className = propObj.class;}
@@ -15,6 +16,7 @@ function eleBuilder(eleStr, propObj) {
     return ele;
 }
 
+/* Finds a file from a filelist by name. If none found, returns null. */
 function findFileByName(fileName, fileList) {
 	for (let i=0;i<fileList.length;i++) {
 		if (fileList[i].name === fileName) {
@@ -25,6 +27,7 @@ function findFileByName(fileName, fileList) {
 	return null;
 }
 
+/* Adds the Scriv2Fic service to the Import Chapters services list. */
 function addService() {
 	if (document.getElementsByClassName("services")[0]) {
 		document.querySelector("div[data-element='serviceSelector'] > main").insertAdjacentHTML("afterBegin","<ul class='services' style='flex:0;-webkit-flex:0;'><li id='s2f'>Scriv2Fic (Local)</li></ul>");
@@ -34,6 +37,7 @@ function addService() {
 	}
 }
 
+/* Handles processing an incoming filelist */
 function processFiles(fileList) {
 	const scrivx = findScrivx(fileList);
 	document.getElementById("scrivTitle").innerHTML = "";
@@ -46,6 +50,7 @@ function processFiles(fileList) {
 
 }
 
+/* Finds a .scrivx file from a filelist */
 function findScrivx(fileList) {
 	for (let i=0;i<fileList.length;i++) {
 		if (fileList[i].name.endsWith(".scrivx")) {
@@ -56,12 +61,14 @@ function findScrivx(fileList) {
 	return;
 }
 
+/* Sets the options for the "Break on chapter level" selector. */
 function setLevelSelector() {
 	for (let i=0;i<=lowLevel;i++) {
 		document.getElementById("breakSelector").innerHTML += `<option value="${i}"">${i}</option>`
 	}
 }
 
+/* Builds a collapisble filetree element by element based on a filelist */
 function buildHierarchy(fileList, level) {
 
 	function generateListing(file, level) {
@@ -105,6 +112,8 @@ function buildHierarchy(fileList, level) {
 	}
 }
 
+/* Processes a scrivx file and generates a directory of documents, 
+which is then built by buildHierarchy() */
 function buildDirectory(scrivx) {
 	document.getElementById("breakSelector").innerHTML = 0;
 	const reader = new FileReader();
@@ -122,6 +131,8 @@ function buildDirectory(scrivx) {
 	};
 }
 
+/* Selects or deselects all children of a file (me) 
+in the file tree to be included in the compile */
 function checkChildren(me) {
 	const includeBoxes = document.getElementsByClassName("compileIncludeBox");
 	const thisBox = me.value.split("|");
@@ -135,6 +146,7 @@ function checkChildren(me) {
 	}
 }
 
+/* Shows or hides all children of a file (me) in the file tree */
 function showHideChildren(me) {
 	const fileItems = document.querySelectorAll("#scrivDir > li");
 	const thisLevel = parseInt(me.value);
@@ -160,12 +172,14 @@ function showHideChildren(me) {
 	}
 }
 
+/* goes back to the Services list */
 function goBack() {
 	document.querySelector("div[data-element='serviceSelector']").className = "";	
 	document.getElementById("scrivSelector").className = "hidden";
 	document.querySelector(".drop-down-pop-up h1 > span").innerText = "Select a Service";
 }
 
+/* Builds the Scriv2Fic UI. */
 function buildUI() {
 	const importPopup = document.getElementsByClassName("import-files-popup")[0];
 	if (!document.getElementById("scrivSelector")) {
@@ -216,8 +230,12 @@ function buildUI() {
 
 //[ID, level, title]
 
+/* Generates an ordered XML document of chapters and scrivenings 
+to be passed to the background script. */
 function prepSubmit(scrivx, chapterLevel) {
 
+	/* Waits for all documents to have been processed, then serializes and submits the 
+	completed XML document to the background script via submitToWorker() */
 	function waitForProcess() {
 		if (startedOperations === finishedOperations && startedOperations + finishedOperations !== 0) {
 			var serializer = new XMLSerializer();
@@ -272,16 +290,19 @@ function prepSubmit(scrivx, chapterLevel) {
 	waitForProcess();
 }
 
+/* Gets the story's story ID from the page URL. */
 function getStoryId() {
 	return window.location.pathname.match(/(?<=\/story\/)\d*/)[0];
 }
 
+/* changes the UI to a 'processing' state. */
 function processingUI() {
 	const submitButton = document.getElementById("submitScriv");
 	submitButton.disabled = true;
 	submitButton.innerText = "Processing...";
 }
 
+/* Displays a message in the UI area. */
 function displayMessage(message) {
 	dispArea = document.querySelector("#scrivSelector > main");
 	dispStr = `
@@ -292,6 +313,8 @@ function displayMessage(message) {
 	dispArea.innerHTML = dispStr;
 }
 
+/* Submits an XML document to the background script, 
+then displays the response via displayMessage. */
 function submitToWorker(compiledXML) {
 	chrome.runtime.sendMessage({
 		xmlString:compiledXML, 
