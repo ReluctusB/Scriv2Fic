@@ -130,8 +130,7 @@ function makeChapter(chapterTitle, chapterBody) {
 				queueDown(); 
 				console.log("Successfully created chapter " + id);
 			}
-		});})
-		
+		});})	
 		.catch(error => console.error(error));
 	}
 
@@ -208,11 +207,7 @@ function convertCompile(xmlString, dividerString) {
 }
 
 /* Converter Todo:
--Size? How do we handle that if we don't know default? Average out the default first? Guess??
-	-Also, don't forget: there are max and min values for size. 32 to 8, looks like. Not sure if that's in pt or not.
--Links (mail and http)
--Proper footnote/comment handling
-
+-quotes
 */
 
 /* Converts RTF document strings into BBCode. */
@@ -301,7 +296,7 @@ function rtfToBBCode (rtfIn) {
 		if (rtfGroups) {		
 			for (let i=0;i<rtfGroups.length;i++) {
 				const args = rtfGroups[i].substring(0,rtfGroups[i].indexOf(" "));
-				let contents = rtfGroups[i].substring(rtfGroups[i].indexOf(" ")).slice(1).replace(/}$/gm,"");
+				let contents = rtfGroups[i].substring(rtfGroups[i].indexOf(" ")).slice(1).replace(/}+$/gm,"");
 				let groupString = "";
 
 				if (nest.length) {
@@ -337,6 +332,14 @@ function rtfToBBCode (rtfIn) {
 							nestLevel--;
 						} else if (nest[nestLevel-1] === "color" && !args.includes("\\cf")) {
 							groupString += "[/color]";
+							nest.splice(nestLevel-1, 1);
+							nestLevel--;
+						} else if (nest[nestLevel-1] === "url" && !args.includes("\\fldrslt")) {
+							groupString += "[/url]";
+							nest.splice(nestLevel-1, 1);
+							nestLevel--;
+						} else if (nest[nestLevel-1] === "email" && !args.includes("\\fldrslt")) {
+							groupString += "[/email]";
 							nest.splice(nestLevel-1, 1);
 							nestLevel--;
 						} else {
@@ -389,6 +392,19 @@ function rtfToBBCode (rtfIn) {
 					tableRef = parseInt(args.match(/(?<=\\cf)\d+/)[0]) - 1;
 					groupString += "[color=" + hexColourTable[tableRef] + "]";
 					nest.push("color");
+				}
+
+				if (args.includes("\\field{\\*\\fldinst")) {
+					linkURL = contents.replace("HYPERLINK ","").replace(/\"/g,"");
+					if (linkURL.includes("mailto:")) {
+						groupString += "[email]";
+						nest.push("email");
+						rtfGroups[i+1] = rtfGroups[i+1].replace("mailto:","");
+					} else if (!contents.includes("scrivcmt")){
+						groupString += "[url=" + linkURL + "]";
+						nest.push("url");
+					}
+					contents = "";					
 				}
 				
 				//Replace all backslashes with an arbitrary unicode string: ⚐Ï⚑
@@ -452,6 +468,14 @@ function rtfToBBCode (rtfIn) {
 					nestLevel--;
 				} else if (nest[nestLevel-1] === "color") {
 					paragraphString += "[/color]";
+					nest.splice(nestLevel-1, 1);
+					nestLevel--;
+				} else if (nest[nestLevel-1] === "url") {
+					paragraphString += "[/url]";
+					nest.splice(nestLevel-1, 1);
+					nestLevel--;
+				} else if (nest[nestLevel-1] === "email") {
+					paragraphString += "[/email]";
 					nest.splice(nestLevel-1, 1);
 					nestLevel--;
 				} else {
