@@ -5,10 +5,11 @@ let storyID = 0;
 let requestNo = 0;
 
 /* Gets an access token via the implicit OAuth2 flow and stores it in localstorage.
-Calls callback function once the access token has been recieved.*/
+Calls callback function once the access token has been recieved. */
 function getToken(callback) {
 
-	/* Waits for the access token to arrive, the calls callback */
+	/* Waits for the access token to arrive, then calls callback. Times out
+	if it takes over 30 tries. */
 	function waitForAuth(retries) {
 		if (authToken) {
 			callback();
@@ -20,7 +21,7 @@ function getToken(callback) {
 		}
 	}
 
-	/* sets a timer to delete the access token from localstorage after 1 hour */
+	/* Sets a timer to delete the access token from localstorage after 1 hour */
 	function setTokenDecay() {
 		setTimeout(()=>window.localStorage.removeItem("scriv2fic_token"), 3600000);
 	}
@@ -209,7 +210,6 @@ function convertCompile(xmlString, dividerString) {
 /* Converter Todo:
 -Size? How do we handle that if we don't know default? Average out the default first? Guess??
 	-Also, don't forget: there are max and min values for size. 32 to 8, looks like. Not sure if that's in pt or not.
--Lists
 -Links (mail and http)
 -Proper footnote/comment handling
 
@@ -239,9 +239,28 @@ function rtfToBBCode (rtfIn) {
 	const rtfParagraphs = splitRTF[1].match(/\\par.*$/gm);
 
 	let alignment = "left";
+	let listLvl = -1;
 	let nest = [];
 	for (let p=0;p<rtfParagraphs.length;p++) {
-		let paragraphString = "\\n\\n";
+
+		let paragraphString = ""
+
+		if (listLvl > -1 && !rtfParagraphs[p].includes("\\ilvl" + listLvl)) {
+			if (!rtfParagraphs[p].includes("\\ilvl")) {
+				while (listLvl > -1) {
+					paragraphString += "[/list]";
+					listLvl -= 1;
+				}
+			} else {
+				let curLvl = parseInt(rtfParagraphs[p].match(/(?<=\\ilvl)\d+/)[0])
+				while (listLvl > curLvl) {
+					paragraphString += "[/list]";
+					listLvl -= 1;
+				}
+			}
+		}
+
+		paragraphString += "\\n\\n";
 
 		const alignmentQuantifier = rtfParagraphs[p].match(/\\(q[lcrj]\\)?ltrch\\loch/);
 		if (alignmentQuantifier) {
@@ -262,7 +281,23 @@ function rtfToBBCode (rtfIn) {
 			paragraphString += "[right]";
 		}
 
-		const rtfGroups = rtfParagraphs[p].match(/(?<!\\){\\f\d.*?}/g);	
+		if (rtfParagraphs[p].includes("\\ls")) {
+			if (parseInt(rtfParagraphs[p].match(/(?<=\\ilvl)\d+/)[0]) > listLvl) {
+				let listType = rtfParagraphs[p].match(/(?<={\\listtext\\f0\\fs22\\b0\\i0\s).(?=\.\s})/);
+				if (listType) {
+					paragraphString += "[list=" + listType[0]+ "]";
+				} else {
+					paragraphString += "[list]";
+				}	
+				listLvl += 1;
+			}	
+		}
+
+		if (listLvl > -1) {
+			paragraphString += "[*]";
+		}
+
+		const rtfGroups = rtfParagraphs[p].match(/(?<!\\){\\f.*?}+/g);	
 		if (rtfGroups) {		
 			for (let i=0;i<rtfGroups.length;i++) {
 				const args = rtfGroups[i].substring(0,rtfGroups[i].indexOf(" "));
