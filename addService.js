@@ -94,7 +94,7 @@ function buildHierarchy(fileList, level) {
 		if (file.getAttribute("Type").endsWith("Folder")) {icon = "folder";}
 		let listString = `<span class='checkbox' style="margin-left: ${(level*2).toString()}rem">
 							<label class='styled-checkbox'>
-								<input type='checkbox' class='compileIncludeBox' value = ${ident+"|"+level+"|"+title.replace(/ /g,"_")} ${include?"checked":""}>
+								<input type='checkbox' class='compileIncludeBox' value = ${ident+"⚐Ï⚑"+level+"⚐Ï⚑"+title.replace(/ /g,"_")} ${include?"checked":""}>
 								<a></a>
 							</label>
 						</span> <i class="fa fa-${icon}" style="margin-right:.5rem"></i> ${title}<b>${hasChildren}</b>`;
@@ -135,10 +135,10 @@ function buildDirectory(scrivx) {
 in the file tree to be included in the compile */
 function checkChildren(me) {
 	const includeBoxes = document.getElementsByClassName("compileIncludeBox");
-	const thisBox = me.value.split("|");
+	const thisBox = me.value.split("⚐Ï⚑");
 	const thisIndex = [...includeBoxes].indexOf(me);
 	for (let i=thisIndex+1;i<includeBoxes.length;i++) {
-		if (parseInt(includeBoxes[i].value.split("|")[1]) > parseInt(thisBox[1])) {
+		if (parseInt(includeBoxes[i].value.split("⚐Ï⚑")[1]) > parseInt(thisBox[1])) {
 			includeBoxes[i].checked = me.checked;
 		} else {
 			return;
@@ -253,7 +253,7 @@ function prepSubmit(scrivx, chapterLevel) {
 	let chapterNo = 0
 	for (let i=0;i<includeBoxes.length;i++) {
 		if (includeBoxes[i].checked) {
-			let valArr = includeBoxes[i].value.split("|");
+			let valArr = includeBoxes[i].value.split("⚐Ï⚑");
 			if (valArr[1] == chapterLevel) {
 				chapterNo++;
 				if (chapterNo > 1000) {

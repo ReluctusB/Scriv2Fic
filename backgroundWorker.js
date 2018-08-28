@@ -91,7 +91,7 @@ function makeChapter(chapterTitle, chapterBody) {
 		}
 	}
 
-	/* creates a chapter with a title of title, 
+	/* Creates a chapter with a title of title, 
 	then passes that title's id over to writeToChapter() */
 	function createChapter(title) {	
 		fetch(apiURL + "stories/"+storyID+"/chapters" + "?fields[chapter]", {
@@ -152,7 +152,7 @@ function notify(message, id, persist = false) {
 	chrome.notifications.onClicked.addListener(() => window.open('https://www.fimfiction.net/story/'+storyID, '_blank'));
 }
 
-/* Unloads the chapter queue. */
+/* Unloads the chapter queue. Notifies user when done.*/
 function queueDown() {
 	if (queue.length) {
 		makeChapter(queue[0].title, queue[0].body);
@@ -205,10 +205,6 @@ function convertCompile(xmlString, dividerString) {
 		getToken(prepChapters);
 	}
 }
-
-/* Converter Todo:
--quotes
-*/
 
 /* Converts RTF document strings into BBCode. */
 function rtfToBBCode (rtfIn) {
@@ -420,6 +416,9 @@ function rtfToBBCode (rtfIn) {
 						contents = contents.replace(uniCode, String.fromCharCode(parseInt(uniCode.slice(4))));
 					});
 				}
+
+				contents = contents.replace("⚐Ï⚑{⚐Ï⚑⚐Ï⚑Scrv_ps=", "[quote]");
+				contents = contents.replace("⚐Ï⚑⚐Ï⚑end_Scrv_ps⚐Ï⚑", "[/quote]");
 
 				contents = contents.replace(/⚐Ï⚑hich⚐Ï⚑f\d ⚐Ï⚑emdash ⚐Ï⚑loch⚐Ï⚑f\d /g,"—");
 
