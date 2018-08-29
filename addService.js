@@ -57,15 +57,18 @@ function findScrivx(fileList) {
 			return fileList[i];
 		}
 	}
-	window.alert("Couldn't find a .scrivx file!");
+	document.getElementById("errorDisplay").innerText = "Couldn't find a .scrivx file.";
 	return;
 }
 
 /* Sets the options for the "Break on chapter level" selector. */
 function setLevelSelector() {
 	for (let i=0;i<=lowLevel;i++) {
-		document.getElementById("breakSelector").innerHTML += `<option value="${i}"">${i}</option>`
+		document.getElementById("breakSelector").innerHTML += `<option value="${i}">${i}</option>`
 	}
+	document.getElementById("breakSelector").addEventListener("change",function() {
+		document.getElementById("breakStyle").innerHTML = `.level${this.value}{text-decoration:underline;}`
+	});
 }
 
 /* Builds a collapisble filetree element by element based on a filelist */
@@ -97,7 +100,8 @@ function buildHierarchy(fileList, level) {
 								<input type='checkbox' class='compileIncludeBox' value = ${ident+"⚐Ï⚑"+level+"⚐Ï⚑"+title.replace(/ /g,"_")} ${include?"checked":""}>
 								<a></a>
 							</label>
-						</span> <i class="fa fa-${icon}" style="margin-right:.5rem"></i> ${title}<b>${hasChildren}</b>`;
+						</span> <i class="fa fa-${icon}" style="margin-right:.5rem"></i> 
+						<span class="level${level}">${title}</span><b>${hasChildren}</b>`;
 		return eleBuilder("LI",{HTML:listString, class:title, value:level, style:"display:"+hierDisplay});
 	}
 
@@ -115,7 +119,7 @@ function buildHierarchy(fileList, level) {
 /* Processes a scrivx file and generates a directory of documents, 
 which is then built by buildHierarchy() */
 function buildDirectory(scrivx) {
-	document.getElementById("breakSelector").innerHTML = 0;
+	document.getElementById("breakSelector").innerHTML = "<option value='-1'></option>";
 	const reader = new FileReader();
 	reader.readAsText(scrivx, "UTF-8");
 	reader.onload = function (evt) {
@@ -191,7 +195,7 @@ function buildUI() {
 					<div id="scrivTitle" style="font-weight:bold; padding:.5rem 0 0 0;"></div>
 				</div>	
 				<div class="files-container" style=overflow:auto;">
-					<ul class="files" id="scrivDir"></ul>
+					<ul class="files" id="scrivDir" style="grid-template-columns:auto;"></ul>
 				</div>
 				<div class="footer-bar styled-input">
 					<label for="breakSelector">Divide chapters on level: </label>
@@ -203,23 +207,25 @@ function buildUI() {
 					<input list="dividerDatalist" id="dividerInput" value="[hr]" style="height: 1.5rem;padding: 0 0 0 5px;min-width: 10rem;margin-left: .2rem;flex:0;webkit-flex:0;">
 					<datalist id="dividerDatalist">
 						<option value="[hr]">
-						<option value="\\n">
+						<option value="\\n\\n\\n">
 					</datalist>
 				</div>
 				<div class="footer-bar">
 					<button class="styled_button" disabled="false" id="submitScriv">Import Project</button>
+					<span id="errorDisplay" style="color:red; font-style:italic; font-size:1rem;"></span>
 				</div>
 			</main>`;
 		const scrivSelector = eleBuilder("DIV", {HTML:stringUI, id:"scrivSelector"});
 		const fileInput = eleBuilder("INPUT",{id:"scrivDrop", type:"file"});
 		fileInput.webkitdirectory = "true";
 		fileInput.accept = ".scriv";
-		fileInput.addEventListener("input",()=>{files=fileInput.files;processFiles(files);});
+		fileInput.addEventListener("input",()=>{files=fileInput.files;processFiles(files);document.getElementById("breakStyle").innerHTML=""});
 		scrivSelector.getElementsByClassName("styled-input")[0].append(fileInput);
 		const backButton = eleBuilder("A",{HTML:"<i class='fa fa-arrow-left'></i>", event:["click", goBack]});
 		backButton.style.marginRight = "0.5rem";
 		scrivSelector.getElementsByClassName("flex")[0].appendChild(backButton);
 		scrivSelector.getElementsByClassName("flex")[0].appendChild(eleBuilder("SPAN",{text:"Scriv2Fic"}));
+		document.getElementsByTagName("HEAD")[0].appendChild(eleBuilder("STYLE",{id:"breakStyle"}));
 		importPopup.appendChild(scrivSelector);
 	}	
 	document.querySelector(".drop-down-pop-up h1 > span").innerText = "Select a Project Folder";
@@ -234,6 +240,9 @@ function buildUI() {
 to be passed to the background script. */
 function prepSubmit(scrivx, chapterLevel) {
 
+	const errorBox = document.getElementById("errorDisplay");
+	errorBox.innerText = "";
+
 	/* Waits for all documents to have been processed, then serializes and submits the 
 	completed XML document to the background script via submitToWorker() */
 	function waitForProcess() {
@@ -243,6 +252,11 @@ function prepSubmit(scrivx, chapterLevel) {
 		} else {
 			setTimeout(waitForProcess,1000);
 		}
+	}
+
+	if (chapterLevel === -1) {
+		errorBox.innerText = "Please select a chapter division level.";
+		return;
 	}
 
 	processingUI();
@@ -257,7 +271,9 @@ function prepSubmit(scrivx, chapterLevel) {
 			if (valArr[1] == chapterLevel) {
 				chapterNo++;
 				if (chapterNo > 1000) {
-					window.alert("Fimfiction does not allow more than 1000 chapters on a story. Check that you have the correct level selected.");
+					errorBox.innerText = "Fimfiction does not allow more than 1000 chapters.";
+					document.getElementById("submitScriv").innerText = "Import Project";
+					document.getElementById("submitScriv").disabled = false;
 					return;
 				}
 				curChapterNode = outputXML.createElement("Chapter");
@@ -287,6 +303,14 @@ function prepSubmit(scrivx, chapterLevel) {
 			}
 		}
 	}
+
+	if (chapterNo === 0) {
+		errorBox.innerText = "No documents for compilation on selected chapter break point.";
+		document.getElementById("submitScriv").innerText = "Import Project";
+		document.getElementById("submitScriv").disabled = false;
+		return;
+	}
+
 	waitForProcess();
 }
 
