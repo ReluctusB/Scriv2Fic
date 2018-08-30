@@ -8,7 +8,7 @@ Calls callback function once the access token has been recieved. */
 function getToken(callback) {
 
 	/* Waits for the access token to arrive, then calls callback. Times out
-	if it takes over 30 tries. */
+	if it takes over 30 tries. Successive retries have longer delays.*/
 	function waitForAuth(retries) {
 		if (authToken) {
 			callback();
@@ -141,7 +141,7 @@ function notify(message, persist = false) {
 		"type": "basic",
 		"title": "Scriv2Fic",
 		"message": message,
-		"iconUrl":"scriv2ficIcon.png",
+		"iconUrl":"Icons/scriv2ficIcon128.png",
 		"requireInteraction": persist
 	});	
 	chrome.notifications.onClicked.addListener(() => window.open('https://www.fimfiction.net/story/'+storyID, '_blank'));
@@ -198,6 +198,7 @@ function convertCompile(xmlString, dividerString) {
 		console.log("Pulling token from storage");
 		prepChapters();
 	} else {
+		if (authtoken) {authToken = null;}
 		getToken(prepChapters);
 	}
 }

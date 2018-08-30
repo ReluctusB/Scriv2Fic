@@ -11,6 +11,11 @@
    "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAoSIv47NiP+zm1vy7HfEhJbvzv7W1YA6KIBD7qXFmmjOGhPVPJT7gnn9usluH2Nju/k9Z2CQhjtWzAlryD1EpLYNOgBf8U2lHYakqayDolkN5J7JdipNj3KO+fy5JeRbAMtNJzubjmxneqESRjGxFpfTWSFDkApN2SUI0lttAtLZczlMkeNnM4Bf9zkt1AC0cNzQfdB8bsgPz/kdk1MGw8XM47wbTwDzQ0SRJrV/y9KPYTN7qDn1WXj1j3du0EBXrxmovKytsFS2C3b2AvEf296pBionnS65lZUhx1clBZ9hKWJpZMu5W4Jhh9FpIS62781I9ETScfKRYGpn5EsAJvwIDAQAB",
    "manifest_version": 2,
    "name": "Scriv2Fic",
+   "icons": {
+   		"16": "Icons/scriv2ficIcon16.png",
+   		"48": "Icons/scriv2ficIcon48.png",
+   		"128": "Icons/scriv2ficIcon128.png"
+   },
    "permissions": [ 
 		"activeTab", 
 		"identity",
