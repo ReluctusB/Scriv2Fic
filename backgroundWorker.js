@@ -2,7 +2,6 @@
 let authToken = null;
 let queue = [];
 let storyID = 0;
-let requestNo = 0;
 
 /* Gets an access token via the implicit OAuth2 flow and stores it in localstorage.
 Calls callback function once the access token has been recieved. */
@@ -14,7 +13,7 @@ function getToken(callback) {
 		if (authToken) {
 			callback();
 		} else if (retries >= 30) {
-			notify("Error: Couldn't get an authorization token! Request timed out.", "error", true);
+			notify("Error: Couldn't get an authorization token! Request timed out.", true);
 		} else {
 			console.log("Waiting for authorization...");
 			setTimeout(()=>waitForAuth(retries+1), 2000);
@@ -63,86 +62,87 @@ function getToken(callback) {
 function makeChapter(chapterTitle, chapterBody) {
 
 	/*handles errors returned in fetch responses. */
-	function handleErrors(errorData) {
+	function handleErrors(errorData, rateRemaining, retryFunction) {
 		console.error(errorData.code + ": " + errorData.title + ": " + errorData.detail);
 		switch(errorData.code) {
 			case 4040: //Resource unavailable
-				notify("Error: 404! Fimfiction may be down. Try again later!", "error", true);
+				notify("Error: 404! Fimfiction may be down. Try again later!", true);
 				break;
 			case 4001: //Bad JSON
-				notify(`Error: Invalid JSON! There's something about your chapter "${chapterTitle}" that we just didn't like. Please send an error report to user RB_ with your chapter's text and title.`, "error", true);
+				notify(`Error: Invalid JSON! There's something about your chapter "${chapterTitle}" that we just didn't like. Please send an error report to user RB_ with your chapter's text and title.`, true);
 				break;
 			case 4030: //Invalid permission (probably switched user)
-				notify("Error: Invalid permissions! If you have switched to a different account, please go back to that account and delete the extra session from your session list before trying again.", "error", true);
+				notify("Error: Invalid permissions! If you have switched to a different account, please go back to that account and delete the extra session from your session list before trying again.", true);
 				break;
 			case 4032: //Invalid token
 				console.log("Stored token has expired but not decayed. Fetching a new one.");
 				authToken = null;
-				getToken(()=>makeChapter(chapterTitle, chapterBody));
+				getToken(retryFunction);
 				break;
 			case 4290: //Rate limited
-				notify("Error: Rate limited! We made too many requests too quickly. Please try again later.", "error", true);
+				setTimeout(retryFunction, rateRemaining*1000 + 1000);
+				notify(`Warning: The application has been rate limited. Halting progress until limit has expired (${rateRemaining} seconds).`, true);
 				break;
 			case 5000: //Internal server error
-				notify("Error: Internal Error! Something went wrong on Fimfiction's end. Try again, and if the problem persists, please contact user RB_.", "error", true);
+				notify("Error: Internal Error! Something went wrong on Fimfiction's end. Try again, and if the problem persists, please contact user RB_.", true);
 				break;
 			default:
-				notify(`Error: Critical faliure! Something has gone horribly wrong. Please contact user RB_ and give him this: "${errorData.code}: ${errorData.detail}"`, "error", true);
+				notify(`Error: Critical faliure! Something has gone horribly wrong. Please contact user RB_ and give him this: "${errorData.code}: ${errorData.detail}"`, true);
 		}
 	}
 
 	/* Creates a chapter with a title of title, 
 	then passes that title's id over to writeToChapter() */
 	function createChapter(title) {	
-		fetch(apiURL + "stories/"+storyID+"/chapters" + "?fields[chapter]", {
-			method: "POST",
-			headers: {
-				"Authorization": "Bearer " + authToken,
-			},
-			body: `{"data": {"type": "chapter","attributes": {"title": "${title}"}}}`
-		})
-		.then(response => {
-			response.json().then(respData=>{
-				if (respData.errors) {
-					handleErrors(respData.errors[0]);
+		const requestURL = apiURL + "stories/"+storyID+"/chapters" + "?fields[chapter]";
+		const requestBody = `{"data": {"type": "chapter","attributes": {"title": "${title}"}}}`;
+		var xhttp = new XMLHttpRequest();
+		xhttp.onreadystatechange = function() {
+		    if (this.readyState == 4) {
+		    	const response = JSON.parse(this.response);	
+		    	if (response.errors) {
+		    		const rateTime = parseInt(this.getResponseHeader("x-rate-limit-reset"));
+					handleErrors(response.errors[0], rateTime, ()=>createChapter(title));
 				} else {
-					requestNo++;
-					setTimeout(()=>writeToChapter(respData.data.id), Math.pow(1.00936093670273, requestNo)+500);
+					setTimeout(()=>writeToChapter(response.data.id), 250);
 				}
-			});
-		})
-		.catch(error => {console.error(error);});
+		    }
+		};
+		xhttp.open("POST", requestURL, true);
+		xhttp.setRequestHeader("Authorization", "Bearer " + authToken);
+		xhttp.send(requestBody);
 	}
 
 	/* Writes contents to chapter by id, then queues up the next chapter to be made. */
 	function writeToChapter(id) {	
-		fetch(apiURL + "chapters/"+ id, {
-			method: "PATCH",
-			headers: {
-				"Authorization": "Bearer " + authToken,
-			},
-			body: `{"data": {"type": "chapter","attributes": {"content": "${chapterBody}"}}}`
-		})
-		.then(response => {response.json().then(respData=>{
-			if (respData.errors) {
-				handleErrors(respData.errors[0]);
-			} else {
-				queueDown(); 
-				console.log("Successfully created chapter " + id);
-			}
-		});})	
-		.catch(error => console.error(error));
+		const requestURL = apiURL + "chapters/"+ id;
+		const requestBody = `{"data": {"type": "chapter","attributes": {"content": "${chapterBody}"}}}`;
+		var xhttp = new XMLHttpRequest();
+		xhttp.onreadystatechange = function() {
+		    if (this.readyState == 4) {
+		    	const response = JSON.parse(this.response);
+		    	if (response.errors) {
+		    		const rateTime = parseInt(this.getResponseHeader("x-rate-limit-reset"));
+					handleErrors(response.errors[0], rateTime, ()=>writeToChapter(id));
+				} else {
+					queueDown(); 
+					console.log("Successfully created chapter " + id);
+				}
+		    }
+		};
+		xhttp.open("PATCH", requestURL, true);
+		xhttp.setRequestHeader("Authorization", "Bearer " + authToken);
+		xhttp.send(requestBody);
 	}
 
 	const apiURL = "https://www.fimfiction.net/api/v2/";
-	requestNo++;
-	setTimeout(()=>createChapter(chapterTitle), Math.pow(1.00936093670273, requestNo)+500);
+	setTimeout(()=>createChapter(chapterTitle), 250);
 	//console.log(chapterBody);
 }
 
 /* Creates a Chrome notification */
-function notify(message, id, persist = false) {
-	let notif = chrome.notifications.create(id, {
+function notify(message, persist = false) {
+	let notif = chrome.notifications.create({
 		"type": "basic",
 		"title": "Scriv2Fic",
 		"message": message,
@@ -158,7 +158,7 @@ function queueDown() {
 		makeChapter(queue[0].title, queue[0].body);
 		queue.shift();
 	} else {
-		notify("Mission success! Your story has been uploaded to Fimfiction.", "Completed");
+		notify("Mission success! Your story has been uploaded to Fimfiction.");
 		const storyURL = "https://www.fimfiction.net/story/" + storyID + "/*"
 		chrome.tabs.query({url:storyURL}, tab => {if (tab[0]) {chrome.tabs.reload(tab[0].id);}})
 		return;
