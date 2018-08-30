@@ -16,13 +16,8 @@ function getToken(callback) {
 			notify("Error: Couldn't get an authorization token! Request timed out.", true);
 		} else {
 			console.log("Waiting for authorization...");
-			setTimeout(()=>waitForAuth(retries+1), 2000);
+			setTimeout(()=>waitForAuth(retries+1), retries*2000);
 		}
-	}
-
-	/* Sets a timer to delete the access token from localstorage after 1 hour */
-	function setTokenDecay() {
-		setTimeout(()=>window.localStorage.removeItem("scriv2fic_token"), 3600000);
 	}
 
 	const reDirURL = chrome.identity.getRedirectURL();
@@ -46,7 +41,7 @@ function getToken(callback) {
 		if (returnState && returnState === state) {
 			console.log("Token recieved!");
 			window.localStorage.setItem("scriv2fic_token", token);
-			setTokenDecay();
+			window.localStorage.setItem("scriv2fic_token_set", Date.now());
 			authToken = token;
 		} else if (returnState){
 			console.error("State mismatch in authorization response!");
@@ -75,7 +70,7 @@ function makeChapter(chapterTitle, chapterBody) {
 				notify("Error: Invalid permissions! If you have switched to a different account, please go back to that account and delete the extra session from your session list before trying again.", true);
 				break;
 			case 4032: //Invalid token
-				console.log("Stored token has expired but not decayed. Fetching a new one.");
+				console.log("Stored token has expired. Fetching a new one.");
 				authToken = null;
 				getToken(retryFunction);
 				break;
@@ -104,7 +99,7 @@ function makeChapter(chapterTitle, chapterBody) {
 		    		const rateTime = parseInt(this.getResponseHeader("x-rate-limit-reset"));
 					handleErrors(response.errors[0], rateTime, ()=>createChapter(title));
 				} else {
-					setTimeout(()=>writeToChapter(response.data.id), 250);
+					setTimeout(()=>writeToChapter(response.data.links.self), 250);
 				}
 		    }
 		};
@@ -114,8 +109,8 @@ function makeChapter(chapterTitle, chapterBody) {
 	}
 
 	/* Writes contents to chapter by id, then queues up the next chapter to be made. */
-	function writeToChapter(id) {	
-		const requestURL = apiURL + "chapters/"+ id;
+	function writeToChapter(url) {	
+		const requestURL = url;
 		const requestBody = `{"data": {"type": "chapter","attributes": {"content": "${chapterBody}"}}}`;
 		var xhttp = new XMLHttpRequest();
 		xhttp.onreadystatechange = function() {
@@ -123,10 +118,10 @@ function makeChapter(chapterTitle, chapterBody) {
 		    	const response = JSON.parse(this.response);
 		    	if (response.errors) {
 		    		const rateTime = parseInt(this.getResponseHeader("x-rate-limit-reset"));
-					handleErrors(response.errors[0], rateTime, ()=>writeToChapter(id));
+					handleErrors(response.errors[0], rateTime, ()=>writeToChapter(url));
 				} else {
 					queueDown(); 
-					console.log("Successfully created chapter " + id);
+					console.log("Successfully created chapter " + chapterTitle);
 				}
 		    }
 		};
@@ -197,7 +192,8 @@ function convertCompile(xmlString, dividerString) {
 	}
 	
 	const storedToken = window.localStorage.getItem("scriv2fic_token");
-	if (storedToken) {
+	const storedTokenDate = window.localStorage.getItem("scriv2fic_token_set");
+	if (storedToken && storedTokenDate && parseInt(storedTokenDate) > Date.now() - 86400000) {
 		authToken = storedToken;
 		console.log("Pulling token from storage");
 		prepChapters();
