@@ -137,7 +137,7 @@ function makeChapter(chapterTitle, chapterBody) {
 	const apiURL = "https://www.fimfiction.net/api/v2/";
 	requestNo++;
 	setTimeout(()=>createChapter(chapterTitle), Math.pow(1.00936093670273, requestNo)+500);
-	console.log(chapterBody);
+	//console.log(chapterBody);
 }
 
 /* Creates a Chrome notification */
@@ -146,7 +146,7 @@ function notify(message, id, persist = false) {
 		"type": "basic",
 		"title": "Scriv2Fic",
 		"message": message,
-		"iconUrl":"fimIcon.png",
+		"iconUrl":"scriv2ficIcon.png",
 		"requireInteraction": persist
 	});	
 	chrome.notifications.onClicked.addListener(() => window.open('https://www.fimfiction.net/story/'+storyID, '_blank'));
@@ -173,7 +173,7 @@ function convertCompile(xmlString, dividerString) {
 	function queueUp(chapterTitle, chapterBody, i) {
 		queue.push({title:chapterTitle, body:chapterBody});
 		if (queue.length === i) {
-			queueDown();	
+			queueDown();
 		}
 	}
 
