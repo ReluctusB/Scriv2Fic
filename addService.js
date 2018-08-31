@@ -16,17 +16,6 @@ function eleBuilder(eleStr, propObj) {
     return ele;
 }
 
-/* Finds a file from a filelist by name. If none found, returns null. */
-function findFileByName(fileName, fileList) {
-	for (let i=0;i<fileList.length;i++) {
-		if (fileList[i].name === fileName) {
-			return fileList[i];
-		}
-	}
-	console.log("Couldn't find file " + fileName);
-	return null;
-}
-
 /* Adds the Scriv2Fic service to the Import Chapters services list. */
 function addService() {
 	if (document.getElementsByClassName("services")[0]) {
@@ -39,6 +28,18 @@ function addService() {
 
 /* Handles processing an incoming filelist */
 function processFiles(fileList) {
+
+	/* Finds a .scrivx file from a filelist */
+	function findScrivx() {
+		for (let i=0;i<fileList.length;i++) {
+			if (fileList[i].name.endsWith(".scrivx")) {
+				return fileList[i];
+			}
+		}
+		document.getElementById("errorDisplay").innerText = "Couldn't find a .scrivx file.";
+		return;
+	}
+
 	const scrivx = findScrivx(fileList);
 	document.getElementById("scrivTitle").innerHTML = "";
 	document.getElementById("scrivDir").innerHTML = "";
@@ -46,28 +47,6 @@ function processFiles(fileList) {
 	document.getElementById("submitScriv").disabled = false;
 	document.getElementById("submitScriv").addEventListener("click", ()=>{
 		prepSubmit(scrivx, parseInt(document.getElementById("breakSelector").value));
-	});
-
-}
-
-/* Finds a .scrivx file from a filelist */
-function findScrivx(fileList) {
-	for (let i=0;i<fileList.length;i++) {
-		if (fileList[i].name.endsWith(".scrivx")) {
-			return fileList[i];
-		}
-	}
-	document.getElementById("errorDisplay").innerText = "Couldn't find a .scrivx file.";
-	return;
-}
-
-/* Sets the options for the "Break on chapter level" selector. */
-function setLevelSelector() {
-	for (let i=0;i<=lowLevel;i++) {
-		document.getElementById("breakSelector").innerHTML += `<option value="${i}">${i}</option>`
-	}
-	document.getElementById("breakSelector").addEventListener("change",function() {
-		document.getElementById("breakStyle").innerHTML = `.level${this.value}{text-decoration:underline;}`
 	});
 }
 
@@ -105,6 +84,32 @@ function buildHierarchy(fileList, level) {
 		return eleBuilder("LI",{HTML:listString, class:title, value:level, style:"display:"+hierDisplay});
 	}
 
+	/* Shows or hides all children of a file (me) in the file tree */
+	function showHideChildren(me) {
+		const fileItems = document.querySelectorAll("#scrivDir > li");
+		const thisLevel = parseInt(me.value);
+		const thisIndex = [...fileItems].indexOf(me);
+		const dropIcon = me.getElementsByTagName("I")[1];
+		if (dropIcon){
+			if (dropIcon.className === "fa fa-angle-right") {
+				dropIcon.className = "fa fa-angle-down";
+			} else {
+				dropIcon.className = "fa fa-angle-right";
+			}
+		}
+		for (let i=thisIndex+1;i<fileItems.length;i++) {
+			if (parseInt(fileItems[i].value) > thisLevel) {
+				if (fileItems[i].style.display !== "none") {
+					fileItems[i].style.display = "none";
+				} else if (fileItems[i].style.display === "none" && parseInt(fileItems[i].value) === thisLevel + 1){
+					fileItems[i].style.display = "flex";
+				}		
+			} else {
+				return;
+			}
+		}
+	}
+
 	if (level > lowLevel) {lowLevel = level;}
 	let untitledNo = 1;
 	for (let i=0;i<fileList.length;i++) {
@@ -119,6 +124,32 @@ function buildHierarchy(fileList, level) {
 /* Processes a scrivx file and generates a directory of documents, 
 which is then built by buildHierarchy() */
 function buildDirectory(scrivx) {
+
+	/* Sets the options for the "Break on chapter level" selector. */
+	function setLevelSelector() {
+		for (let i=0;i<=lowLevel;i++) {
+			document.getElementById("breakSelector").innerHTML += `<option value="${i}">${i}</option>`
+		}
+		document.getElementById("breakSelector").addEventListener("change",function() {
+			document.getElementById("breakStyle").innerHTML = `.level${this.value}{text-decoration:underline;}`
+		});
+	}
+
+	/* Selects or deselects all children of a file (me) 
+	in the file tree to be included in the compile */
+	function checkChildren(me) {
+		const includeBoxes = document.getElementsByClassName("compileIncludeBox");
+		const thisBox = me.value.split("⚐Ï⚑");
+		const thisIndex = [...includeBoxes].indexOf(me);
+		for (let i=thisIndex+1;i<includeBoxes.length;i++) {
+			if (parseInt(includeBoxes[i].value.split("⚐Ï⚑")[1]) > parseInt(thisBox[1])) {
+				includeBoxes[i].checked = me.checked;
+			} else {
+				return;
+			}
+		}
+	}
+
 	document.getElementById("breakSelector").innerHTML = "<option value='-1'></option>";
 	const reader = new FileReader();
 	reader.readAsText(scrivx, "UTF-8");
@@ -135,56 +166,16 @@ function buildDirectory(scrivx) {
 	};
 }
 
-/* Selects or deselects all children of a file (me) 
-in the file tree to be included in the compile */
-function checkChildren(me) {
-	const includeBoxes = document.getElementsByClassName("compileIncludeBox");
-	const thisBox = me.value.split("⚐Ï⚑");
-	const thisIndex = [...includeBoxes].indexOf(me);
-	for (let i=thisIndex+1;i<includeBoxes.length;i++) {
-		if (parseInt(includeBoxes[i].value.split("⚐Ï⚑")[1]) > parseInt(thisBox[1])) {
-			includeBoxes[i].checked = me.checked;
-		} else {
-			return;
-		}
-	}
-}
-
-/* Shows or hides all children of a file (me) in the file tree */
-function showHideChildren(me) {
-	const fileItems = document.querySelectorAll("#scrivDir > li");
-	const thisLevel = parseInt(me.value);
-	const thisIndex = [...fileItems].indexOf(me);
-	const dropIcon = me.getElementsByTagName("I")[1];
-	if (dropIcon){
-		if (dropIcon.className === "fa fa-angle-right") {
-			dropIcon.className = "fa fa-angle-down";
-		} else {
-			dropIcon.className = "fa fa-angle-right";
-		}
-	}
-	for (let i=thisIndex+1;i<fileItems.length;i++) {
-		if (parseInt(fileItems[i].value) > thisLevel) {
-			if (fileItems[i].style.display !== "none") {
-				fileItems[i].style.display = "none";
-			} else if (fileItems[i].style.display === "none" && parseInt(fileItems[i].value) === thisLevel + 1){
-				fileItems[i].style.display = "flex";
-			}		
-		} else {
-			return;
-		}
-	}
-}
-
-/* goes back to the Services list */
-function goBack() {
-	document.querySelector("div[data-element='serviceSelector']").className = "";	
-	document.getElementById("scrivSelector").className = "hidden";
-	document.querySelector(".drop-down-pop-up h1 > span").innerText = "Select a Service";
-}
-
 /* Builds the Scriv2Fic UI. */
 function buildUI() {
+
+	/* Goes back to the Services list */
+	function goBack() {
+		document.querySelector("div[data-element='serviceSelector']").className = "";	
+		document.getElementById("scrivSelector").className = "hidden";
+		document.querySelector(".drop-down-pop-up h1 > span").innerText = "Select a Service";
+	}
+
 	const importPopup = document.getElementsByClassName("import-files-popup")[0];
 	if (!document.getElementById("scrivSelector")) {
 		const stringUI = `
@@ -234,8 +225,6 @@ function buildUI() {
 	document.getElementById("scrivSelector").className = "";
 }
 
-//[ID, level, title]
-
 /* Generates an ordered XML document of chapters and scrivenings 
 to be passed to the background script. */
 function prepSubmit(scrivx, chapterLevel) {
@@ -254,12 +243,40 @@ function prepSubmit(scrivx, chapterLevel) {
 		}
 	}
 
+	/* Finds a file from a filelist by name. If none found, returns null. 
+	The way Scrivener handles empty documents means that sometimes there are references in the 
+	.scrivx to files that don't exist, so we don't throw an error on missing files and just 
+	skip over them for compilation.*/
+	function findFileByName(fileName, fileList) {
+		for (let i=0;i<fileList.length;i++) {
+			if (fileList[i].name === fileName) {
+				return fileList[i];
+			}
+		}
+		console.log("Couldn't find file " + fileName);
+		return null;
+	}
+
+	/* Changes the UI to a 'processing' state. */
+	function setProcessingUI() {
+		const submitButton = document.getElementById("submitScriv");
+		submitButton.disabled = true;
+		submitButton.innerText = "Processing...";
+	}
+
+	/* Displays an error message (message) in the UI, then resets the UI. */
+	function displayError(message) {
+		errorBox.innerText = message;
+		document.getElementById("submitScriv").innerText = "Import Project";
+		document.getElementById("submitScriv").disabled = false;
+	}
+
 	if (chapterLevel === -1) {
-		errorBox.innerText = "Please select a chapter division level.";
+		displayError("Please select a chapter division level.");
 		return;
 	}
 
-	processingUI();
+	setProcessingUI();
 	let outputXML = document.implementation.createDocument(null, "Story");
 	const includeBoxes = document.getElementsByClassName("compileIncludeBox");
 	let curChapterNode = null;
@@ -267,13 +284,11 @@ function prepSubmit(scrivx, chapterLevel) {
 	let chapterNo = 0
 	for (let i=0;i<includeBoxes.length;i++) {
 		if (includeBoxes[i].checked) {
-			let valArr = includeBoxes[i].value.split("⚐Ï⚑");
+			let valArr = includeBoxes[i].value.split("⚐Ï⚑"); //[ID, level, title]
 			if (valArr[1] == chapterLevel) {
 				chapterNo++;
 				if (chapterNo > 1000) {
-					errorBox.innerText = "Fimfiction does not allow more than 1000 chapters.";
-					document.getElementById("submitScriv").innerText = "Import Project";
-					document.getElementById("submitScriv").disabled = false;
+					displayError("Fimfiction does not allow more than 1000 chapters.");
 					return;
 				}
 				curChapterNode = outputXML.createElement("Chapter");
@@ -305,25 +320,11 @@ function prepSubmit(scrivx, chapterLevel) {
 	}
 
 	if (chapterNo === 0) {
-		errorBox.innerText = "No documents for compilation on selected chapter break point.";
-		document.getElementById("submitScriv").innerText = "Import Project";
-		document.getElementById("submitScriv").disabled = false;
+		displayError("No documents for compilation on selected chapter break point.");
 		return;
 	}
 
 	waitForProcess();
-}
-
-/* Gets the story's story ID from the page URL. */
-function getStoryId() {
-	return window.location.pathname.match(/(?<=\/story\/)\d*/)[0];
-}
-
-/* changes the UI to a 'processing' state. */
-function processingUI() {
-	const submitButton = document.getElementById("submitScriv");
-	submitButton.disabled = true;
-	submitButton.innerText = "Processing...";
 }
 
 /* Displays a message in the UI area. */
@@ -340,9 +341,10 @@ function displayMessage(message) {
 /* Submits an XML document to the background script, 
 then displays the response via displayMessage. */
 function submitToWorker(compiledXML) {
+	const id = window.location.pathname.match(/(?<=\/story\/)\d*/)[0];
 	chrome.runtime.sendMessage({
-		xmlString:compiledXML, 
-		storyID:getStoryId(), 
+		xmlString: compiledXML, 
+		storyID: id, 
 		divider: document.getElementById("dividerInput").value
 	}, function(response) {
 		displayMessage(response.farewell);
