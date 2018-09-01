@@ -19,7 +19,7 @@ function eleBuilder(eleStr, propObj) {
 /* Adds the Scriv2Fic service to the Import Chapters services list. */
 function addService() {
 	if (document.getElementsByClassName("services")[0]) {
-		document.querySelector("div[data-element='serviceSelector'] > main").insertAdjacentHTML("afterBegin","<ul class='services' style='flex:0;-webkit-flex:0;'><li id='s2f'>Scriv2Fic (Local)</li></ul>");
+		document.querySelector("div[data-element='serviceSelector'] > main").insertAdjacentHTML("afterBegin","<ul class='services' style='flex:0;-webkit-flex:0;'><li id='s2f'>Scrivener (Scriv2Fic)</li></ul>");
 		document.getElementById("s2f").addEventListener("click", buildUI);
 	} else {
 		setTimeout(addService,500);
@@ -103,7 +103,11 @@ function buildHierarchy(fileList, level) {
 					fileItems[i].style.display = "none";
 				} else if (fileItems[i].style.display === "none" && parseInt(fileItems[i].value) === thisLevel + 1){
 					fileItems[i].style.display = "flex";
-				}		
+				}
+				const fileDropIcon = fileItems[i].getElementsByTagName("I")[1];
+				if (fileDropIcon) {
+					fileDropIcon.className = "fa fa-angle-right";
+				}
 			} else {
 				return;
 			}

@@ -8,7 +8,7 @@ Calls callback function once the access token has been recieved. */
 function getToken(callback) {
 
 	/* Waits for the access token to arrive, then calls callback. Times out
-	if it takes over 30 tries. Successive retries have longer delays.*/
+	if it takes over a minute.*/
 	function waitForAuth(retries) {
 		if (authToken) {
 			callback();
@@ -16,7 +16,7 @@ function getToken(callback) {
 			notify("Error: Couldn't get an authorization token! Request timed out.", true);
 		} else {
 			console.log("Waiting for authorization...");
-			setTimeout(()=>waitForAuth(retries+1), retries*2000);
+			setTimeout(()=>waitForAuth(retries+1), 2000);
 		}
 	}
 
