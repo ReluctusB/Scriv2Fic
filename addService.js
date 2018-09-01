@@ -345,7 +345,7 @@ function displayMessage(message) {
 /* Submits an XML document to the background script, 
 then displays the response via displayMessage. */
 function submitToWorker(compiledXML) {
-	const id = window.location.pathname.match(/(?<=\/story\/)\d*/)[0];
+	const id = window.location.pathname.match(/\d+/)[0];
 	chrome.runtime.sendMessage({
 		xmlString: compiledXML, 
 		storyID: id, 

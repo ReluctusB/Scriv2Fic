@@ -13,7 +13,7 @@ function getToken(callback) {
 		if (authToken) {
 			callback();
 		} else if (retries >= 30) {
-			notify("Error: Couldn't get an authorization token! Request timed out.", true);
+			notify("Error: Couldn't get an authorization token! Request timed out.");
 		} else {
 			console.log("Waiting for authorization...");
 			setTimeout(()=>waitForAuth(retries+1), 2000);
@@ -21,6 +21,7 @@ function getToken(callback) {
 	}
 
 	const reDirURL = chrome.identity.getRedirectURL();
+	console.log(reDirURL);
 	const clientID = "mGzeZKcuYZZtaOvOW361xC3qlHPnLriw";
 	const rArray = new Uint32Array(8);
 	const state = window.crypto.getRandomValues(rArray).join("");
@@ -36,8 +37,9 @@ function getToken(callback) {
 		url: authURL,
 		interactive: true
 	}, function(redirect_url){
-		const token = redirect_url.match(/(?<=token=).*(?=&)/)[0];
-		const returnState = redirect_url.match(/(?<=state=).*/)[0];
+		const params = (new URL(redirect_url.replace("#","?"))).searchParams;
+		const token = params.get("token");
+		const returnState = params.get("state");
 		if (returnState && returnState === state) {
 			console.log("Token recieved!");
 			window.localStorage.setItem("scriv2fic_token", token);
@@ -61,13 +63,13 @@ function makeChapter(chapterTitle, chapterBody) {
 		console.error(errorData.code + ": " + errorData.title + ": " + errorData.detail);
 		switch(errorData.code) {
 			case 4040: //Resource unavailable
-				notify("Error: 404! Fimfiction may be down. Try again later!", true);
+				notify("Error: 404! Fimfiction may be down. Try again later!");
 				break;
 			case 4001: //Bad JSON
-				notify(`Error: Invalid JSON! There's something about your chapter "${chapterTitle}" that we just didn't like. Please send an error report to user RB_ with your chapter's text and title.`, true);
+				notify(`Error: Invalid JSON! There's something about your chapter "${chapterTitle}" that we just didn't like. Please send an error report to user RB_ with your chapter's text and title.`);
 				break;
 			case 4030: //Invalid permission (probably switched user)
-				notify("Error: Invalid permissions! If you have switched to a different account, please go back to that account and delete the extra session from your session list before trying again.", true);
+				notify("Error: Invalid permissions! If you have switched to a different account, please go back to that account and delete the extra session from your session list before trying again.");
 				break;
 			case 4032: //Invalid token
 				console.log("Stored token has expired. Fetching a new one.");
@@ -76,13 +78,13 @@ function makeChapter(chapterTitle, chapterBody) {
 				break;
 			case 4290: //Rate limited
 				setTimeout(retryFunction, rateRemaining*1000 + 1000);
-				notify(`Warning: The application has been rate limited. Halting progress until limit has expired (${rateRemaining} seconds).`, true);
+				notify(`Warning: The application has been rate limited. Halting progress until limit has expired (${rateRemaining} seconds).`);
 				break;
 			case 5000: //Internal server error
-				notify("Error: Internal Error! Something went wrong on Fimfiction's end. Try again, and if the problem persists, please contact user RB_.", true);
+				notify("Error: Internal Error! Something went wrong on Fimfiction's end. Try again, and if the problem persists, please contact user RB_.");
 				break;
 			default:
-				notify(`Error: Critical faliure! Something has gone horribly wrong. Please contact user RB_ and give him this: "${errorData.code}: ${errorData.detail}"`, true);
+				notify(`Error: Critical faliure! Something has gone horribly wrong. Please contact user RB_ and give him this: "${errorData.code}: ${errorData.detail}"`);
 		}
 	}
 
@@ -136,13 +138,12 @@ function makeChapter(chapterTitle, chapterBody) {
 }
 
 /* Creates a Chrome notification */
-function notify(message, persist = false) {
-	let notif = chrome.notifications.create({
+function notify(message) {
+	chrome.notifications.create({
 		"type": "basic",
 		"title": "Scriv2Fic",
 		"message": message,
-		"iconUrl":"Icons/scriv2ficIcon128.png",
-		"requireInteraction": persist
+		"iconUrl": chrome.extension.getURL("Icons/scriv2ficIcon128.png")
 	});	
 	chrome.notifications.onClicked.addListener(() => window.open('https://www.fimfiction.net/story/'+storyID, '_blank'));
 }
@@ -198,7 +199,7 @@ function convertCompile(xmlString, dividerString) {
 		console.log("Pulling token from storage");
 		prepChapters();
 	} else {
-		if (authtoken) {authToken = null;}
+		if (authToken) {authToken = null;}
 		getToken(prepChapters);
 	}
 }
@@ -219,7 +220,7 @@ function rtfToBBCode (rtfIn) {
 	const splitRTF = rtfIn.split("\\pgnstarts0", 2);
 
 	let hexColourTable = [];
-	splitRTF[0].match(/(?<={\\colortbl;).+(?=;})/)[0].split(";").forEach(pallet => {
+	splitRTF[0].match(/{\\colortbl;.+(?=;})/)[0].replace("{\\colortbl;","").split(";").forEach(pallet => {
 		hexColourTable.push(rgbToHex(pallet.replace("\\red","").replace("green","").replace("blue","").split("\\")));
 	});
 
@@ -240,7 +241,7 @@ function rtfToBBCode (rtfIn) {
 					listLvl -= 1;
 				}
 			} else {
-				let curLvl = parseInt(rtfParagraphs[p].match(/(?<=\\ilvl)\d+/)[0])
+				let curLvl = parseInt(rtfParagraphs[p].match(/\\ilvl\d+/)[0].replace("\\ilvl",""));
 				while (listLvl > curLvl) {
 					paragraphString += "[/list]";
 					listLvl -= 1;
@@ -270,10 +271,10 @@ function rtfToBBCode (rtfIn) {
 		}
 
 		if (rtfParagraphs[p].includes("\\ls")) {
-			if (parseInt(rtfParagraphs[p].match(/(?<=\\ilvl)\d+/)[0]) > listLvl) {
-				let listType = rtfParagraphs[p].match(/(?<={\\listtext\\f0\\fs22\\b0\\i0\s).(?=\.\s})/);
+			if (parseInt(rtfParagraphs[p].match(/\\ilvl\d+/)[0].replace("\\ilvl","")) > listLvl) {
+				let listType = rtfParagraphs[p].match(/{\\listtext\\f0\\fs22\\b0\\i0\s.(?=\.\s})/);
 				if (listType) {
-					paragraphString += "[list=" + listType[0]+ "]";
+					paragraphString += "[list=" + listType[0].replace(/{\\listtext\\f0\\fs22\\b0\\i0\s/,"") + "]";
 				} else {
 					paragraphString += "[list]";
 				}	
@@ -285,7 +286,7 @@ function rtfToBBCode (rtfIn) {
 			paragraphString += "[*]";
 		}
 
-		const rtfGroups = rtfParagraphs[p].match(/(?<!\\){\\f.*?}+/g);	
+		const rtfGroups = rtfParagraphs[p].match(/{\\f.*?}+/g);	
 		if (rtfGroups) {		
 			for (let i=0;i<rtfGroups.length;i++) {
 				const args = rtfGroups[i].substring(0,rtfGroups[i].indexOf(" "));
@@ -382,7 +383,7 @@ function rtfToBBCode (rtfIn) {
 				}
 
 				if (args.includes("\\cf") && !nest.includes("color")) {
-					tableRef = parseInt(args.match(/(?<=\\cf)\d+/)[0]) - 1;
+					tableRef = parseInt(args.match(/\\cf\d+/)[0].replace("\\cf","")) - 1;
 					groupString += "[color=" + hexColourTable[tableRef] + "]";
 					nest.push("color");
 				}
@@ -408,7 +409,7 @@ function rtfToBBCode (rtfIn) {
 				/* -Unicode- */
 				const unicodeChars = contents.match(/⚐Ï⚑u\d+⚐Ï⚑/g);
 				if (unicodeChars) {
-					contents = contents.replace(/⚐Ï⚑loch⚐Ï⚑af\d⚐Ï⚑hich⚐Ï⚑af\d⚐Ï⚑dbch⚐Ï⚑af\d⚐Ï⚑uc1|(?<=⚐Ï⚑u\d\d\d\d⚐Ï⚑)'\w\w/g, "");
+					contents = contents.replace(/⚐Ï⚑loch⚐Ï⚑af\d⚐Ï⚑hich⚐Ï⚑af\d⚐Ï⚑dbch⚐Ï⚑af\d⚐Ï⚑uc1|'\w\w/g, "");
 					unicodeChars.forEach(uniCode => {
 						contents = contents.replace(uniCode, String.fromCharCode(parseInt(uniCode.slice(4))));
 					});
@@ -419,8 +420,8 @@ function rtfToBBCode (rtfIn) {
 
 				contents = contents.replace(/⚐Ï⚑hich⚐Ï⚑f\d ⚐Ï⚑emdash ⚐Ï⚑loch⚐Ï⚑f\d /g,"—");
 
-				contents = contents.replace(/(?<!⚐Ï⚑)⚐Ï⚑tab /g, "\\t");
-				contents = contents.replace(/(?<!⚐Ï⚑)⚐Ï⚑line /g, "\\n");			
+				contents = contents.replace(/⚐Ï⚑tab /g, "\\t");
+				contents = contents.replace(/⚐Ï⚑line /g, "\\n");			
 				contents = contents.replace(/"/g, `\\"`);		
 
 				//Return all remaining instances of the unicode string back to backslashes.
