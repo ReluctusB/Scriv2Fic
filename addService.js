@@ -22,7 +22,7 @@ function addService() {
 		document.querySelector("div[data-element='serviceSelector'] > main").insertAdjacentHTML("afterBegin","<ul class='services' style='flex:0;-webkit-flex:0;'><li id='s2f'>Scrivener (Scriv2Fic)</li></ul>");
 		document.getElementById("s2f").addEventListener("click", buildUI);
 	} else {
-		setTimeout(addService,500);
+		setTimeout(addService, 500);
 	}
 }
 
@@ -32,9 +32,7 @@ function processFiles(fileList) {
 	/* Finds a .scrivx file from a filelist */
 	function findScrivx() {
 		for (let i=0;i<fileList.length;i++) {
-			if (fileList[i].name.endsWith(".scrivx")) {
-				return fileList[i];
-			}
+			if (fileList[i].name.endsWith(".scrivx")) {return fileList[i];}
 		}
 		document.getElementById("errorDisplay").innerText = "Couldn't find a .scrivx file.";
 		return;

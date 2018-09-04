@@ -12,7 +12,7 @@ function getToken(callback) {
 	function waitForAuth(retries) {
 		if (authToken) {
 			callback();
-		} else if (retries >= 30) {
+		} else if (retries >= 60) {
 			notify("Error: Couldn't get an authorization token! Request timed out.");
 		} else {
 			console.log("Waiting for authorization...");
@@ -60,21 +60,24 @@ function makeChapter(chapterTitle, chapterBody) {
 
 	/*handles errors returned in fetch responses. */
 	function handleErrors(errorData, rateRemaining, retryFunction) {
-		console.error(errorData.code + ": " + errorData.title + ": " + errorData.detail);
+		console.error(chapterTitle + ": " + errorData.code + ": " + errorData.title + ": " + errorData.detail);
 		switch(errorData.code) {
 			case 4040: //Resource unavailable
 				notify("Error: 404! Fimfiction may be down. Try again later!");
 				break;
 			case 4001: //Bad JSON
-				notify(`Error: Invalid JSON! There's something about your chapter "${chapterTitle}" that we just didn't like. Please send an error report to user RB_ with your chapter's text and title.`);
+				notify(`Error: Invalid JSON! There's something about "${chapterTitle}" that we just didn't like. Please send an error report to user RB_ with your chapter's text and title.`);
 				break;
 			case 4030: //Invalid permission (probably switched user)
-				notify("Error: Invalid permissions! If you have switched to a different account, please go back to that account and delete the extra session from your session list before trying again.");
+				notify("Error: Invalid permissions! If you have switched to a different account, please go back to that account and delete the extra session from your session list.");
 				break;
 			case 4032: //Invalid token
-				console.log("Stored token has expired. Fetching a new one.");
+				console.log("Stored token has expired or was invalid. Fetching a new one.");
 				authToken = null;
 				getToken(retryFunction);
+				break;
+			case 4225: //Invalid argument (Chapter too long)
+				notify(`Error:  Chapter ${chapterTitle} too long! We're sorry; because of a limitation with the API, we are currently unable to upload chapters beyond a certain length.`);
 				break;
 			case 4290: //Rate limited
 				setTimeout(retryFunction, rateRemaining*1000 + 1000);
