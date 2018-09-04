@@ -21,7 +21,6 @@ function getToken(callback) {
 	}
 
 	const reDirURL = chrome.identity.getRedirectURL();
-	console.log(reDirURL);
 	const clientID = "mGzeZKcuYZZtaOvOW361xC3qlHPnLriw";
 	const rArray = new Uint32Array(8);
 	const state = window.crypto.getRandomValues(rArray).join("");
@@ -418,14 +417,13 @@ function rtfToBBCode (rtfIn) {
 					});
 				}
 
-				contents = contents.replace("⚐Ï⚑{⚐Ï⚑⚐Ï⚑Scrv_ps=", "[quote]");
-				contents = contents.replace("⚐Ï⚑⚐Ï⚑end_Scrv_ps⚐Ï⚑", "[/quote]");
-
-				contents = contents.replace(/⚐Ï⚑hich⚐Ï⚑f\d ⚐Ï⚑emdash ⚐Ï⚑loch⚐Ï⚑f\d /g,"—");
-
-				contents = contents.replace(/⚐Ï⚑tab /g, "\\t");
-				contents = contents.replace(/⚐Ï⚑line /g, "\\n");			
-				contents = contents.replace(/"/g, `\\"`);		
+				contents = contents
+					.replace("⚐Ï⚑{⚐Ï⚑⚐Ï⚑Scrv_ps=", "[quote]")
+					.replace("⚐Ï⚑⚐Ï⚑end_Scrv_ps⚐Ï⚑", "[/quote]")
+					.replace(/⚐Ï⚑hich⚐Ï⚑f\d ⚐Ï⚑emdash ⚐Ï⚑loch⚐Ï⚑f\d /g,"—")
+					.replace(/⚐Ï⚑tab /g, "\\t")
+					.replace(/⚐Ï⚑line /g, "\\n")
+					.replace(/"/g, `\\"`);
 
 				//Return all remaining instances of the unicode string back to backslashes.
 				contents = contents.replace(/(⚐Ï⚑){1,2}/g, "\\\\");
@@ -511,6 +509,12 @@ chrome.runtime.onMessage.addListener(
 		    	+"<span style='font-weight:bold;'>Your document is now being processed into BBCode and sent to Fimfiction.</span><br><br>"
 		    	+"This may take a little while, but don't worry! "
 		    	+"You can safely navigate away from this page, and we'll alert you when we're done."
+		    });
+		} else {
+			sendResponse({
+		    	farewell: "<h1 style='font-size:2rem;font-weight:bold;'>I just don't know what went wrong!</h1>"
+		    	+"Something broke somewhere along the line. If you're seeing this, please contact user "
+		    	+"<a href='https://www.fimfiction.net/user/34408/RB_>RB_</a> and tell him he messed up."
 		    });
 		}
 	}
