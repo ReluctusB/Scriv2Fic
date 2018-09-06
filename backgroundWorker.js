@@ -88,10 +88,10 @@ function handleErrors(errorData, action, rateRemaining, retryFunction) {
 	}
 }
 
-/*Deletes all prexisting chapters, then calls callback (The makeChapters function). */
+/* Deletes all prexisting chapters, then calls callback (The makeChapters function). */
 function deleteExistingChapters(callback) {
 
-	/*Gets a list of all existing chapters, then passes them off to deleteChapters. */
+	/* Gets a list of all existing chapters, then passes them off to deleteChapters. */
 	function getExistingChapters() {
 		const requestURL = apiURL + "stories/"+storyID+"/chapters";
 		var xhttp = new XMLHttpRequest();
@@ -205,13 +205,13 @@ function makeChapter(chapterTitle, chapterBody) {
 
 /* Creates a Chrome notification */
 function notify(message) {
-	chrome.notifications.create({
+	chrome.notifications.create(storyID, {
 		"type": "basic",
 		"title": "Scriv2Fic",
 		"message": message,
-		"iconUrl": chrome.extension.getURL("Icons/scriv2ficIcon128.png")
+		"iconUrl": chrome.extension.getURL("Icons/scriv2ficIcon128.png"),
 	});	
-	chrome.notifications.onClicked.addListener(() => window.open('https://www.fimfiction.net/story/'+storyID, '_blank'));
+	chrome.notifications.onClicked.addListener(id => window.open('https://www.fimfiction.net/story/'+id, '_blank'));
 }
 
 /* Unloads the chapter queue. Notifies user when done.*/

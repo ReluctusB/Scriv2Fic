@@ -197,20 +197,20 @@ function buildUI() {
 					<ul class="files" id="scrivDir" style="grid-template-columns:auto;"></ul>
 				</div>
 				<div style="display:grid; grid-template-columns:auto auto;">
-					<div class="footer-bar styled-input">
+					<div class="footer-bar styled-input" style="border-radius: 5px 0 0 0;">
 						<label for="breakSelector">Divide chapters on level: </label>
 						<select id="breakSelector" style="height: 1.5rem;padding: 0;min-width: 2.5rem;margin-left: .2rem;flex:0;webkit-flex:0;">
 						</select>
 					</div>
-					<div class="footer-bar styled-input">
+					<div class="footer-bar styled-input" style="border-radius: 0 5px 0 0;">
 						<label for="dividerDatalist">Divider: </label>
-						<input list="dividerDatalist" id="dividerInput" value="[hr]" style="height: 1.5rem;padding: 0 0 0 5px;min-width: 10rem;margin-left: .2rem;flex:0;webkit-flex:0;">
+						<input list="dividerDatalist" id="dividerInput" value="[hr]" style="height: 1.5rem;padding: 0 0 0 5px;min-width: 75%;margin-left: .2rem;flex:0;webkit-flex:0;">
 						<datalist id="dividerDatalist">
 							<option value="[hr]">
 							<option value="\\n\\n\\n">
 						</datalist>
 					</div>
-					<div class="footer-bar styled-input" style="grid-column: span 2;">
+					<div class="footer-bar styled-input" style="grid-column: span 2; border-radius: 0;">
 						<label for="deleteCheckbox">Replace all existing chapters <i>(cannot be undone!):</i></label>
 						<label class="toggleable-switch" style="margin-left: .5rem;">
 							<input class="checkbox" type="checkbox" id="deleteCheckbox">

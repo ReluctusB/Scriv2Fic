@@ -22,7 +22,7 @@
    		"128": "Icons/scriv2ficIcon128.png"
    },
    "permissions": [ 
-		"activeTab", 
+		"activeTab",
 		"identity",
 		"notifications",
 		"tabs",
