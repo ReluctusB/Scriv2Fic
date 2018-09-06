@@ -171,11 +171,17 @@ function buildDirectory(scrivx) {
 /* Builds the Scriv2Fic UI. */
 function buildUI() {
 
-	/* Goes back to the Services list */
+	/* Goes back to the Services list. */
 	function goBack() {
 		document.querySelector("div[data-element='serviceSelector']").className = "";	
 		document.getElementById("scrivSelector").className = "hidden";
 		document.querySelector(".drop-down-pop-up h1 > span").innerText = "Select a Service";
+	}
+
+	/* Gets confirmation with the yser when the :Replace all" option is selected. */
+	function confirmDelete(me) {
+		const delMessage = "This will permenantly delete all existing chapters. Are you sure you want to go through with this?";
+		if (me.checked && !window.confirm(delMessage)) {me.checked = false;}
 	}
 
 	const importPopup = document.getElementsByClassName("import-files-popup")[0];
@@ -190,18 +196,27 @@ function buildUI() {
 				<div class="files-container" style=overflow:auto;">
 					<ul class="files" id="scrivDir" style="grid-template-columns:auto;"></ul>
 				</div>
-				<div class="footer-bar styled-input">
-					<label for="breakSelector">Divide chapters on level: </label>
-					<select id="breakSelector" style="height: 1.5rem;padding: 0;min-width: 2.5rem;margin-left: .2rem;flex:0;webkit-flex:0;">
-					</select>
-				</div>
-				<div class="footer-bar styled-input">
-					<label for="dividerDatalist">Divide adjacent documents using: </label>
-					<input list="dividerDatalist" id="dividerInput" value="[hr]" style="height: 1.5rem;padding: 0 0 0 5px;min-width: 10rem;margin-left: .2rem;flex:0;webkit-flex:0;">
-					<datalist id="dividerDatalist">
-						<option value="[hr]">
-						<option value="\\n\\n\\n">
-					</datalist>
+				<div style="display:grid; grid-template-columns:auto auto;">
+					<div class="footer-bar styled-input">
+						<label for="breakSelector">Divide chapters on level: </label>
+						<select id="breakSelector" style="height: 1.5rem;padding: 0;min-width: 2.5rem;margin-left: .2rem;flex:0;webkit-flex:0;">
+						</select>
+					</div>
+					<div class="footer-bar styled-input">
+						<label for="dividerDatalist">Divider: </label>
+						<input list="dividerDatalist" id="dividerInput" value="[hr]" style="height: 1.5rem;padding: 0 0 0 5px;min-width: 10rem;margin-left: .2rem;flex:0;webkit-flex:0;">
+						<datalist id="dividerDatalist">
+							<option value="[hr]">
+							<option value="\\n\\n\\n">
+						</datalist>
+					</div>
+					<div class="footer-bar styled-input" style="grid-column: span 2;">
+						<label for="deleteCheckbox">Replace all existing chapters <i>(cannot be undone!):</i></label>
+						<label class="toggleable-switch" style="margin-left: .5rem;">
+							<input class="checkbox" type="checkbox" id="deleteCheckbox">
+							<a></a>
+						</label>
+					</div>
 				</div>
 				<div class="footer-bar">
 					<button class="styled_button" disabled="false" id="submitScriv">Import Project</button>
@@ -221,6 +236,7 @@ function buildUI() {
 		document.getElementsByTagName("HEAD")[0].appendChild(eleBuilder("STYLE",{id:"breakStyle"}));
 		importPopup.appendChild(scrivSelector);
 	}	
+	document.getElementById("deleteCheckbox").addEventListener("change", function() {confirmDelete(this)});
 	document.querySelector(".drop-down-pop-up h1 > span").innerText = "Select a Project Folder";
 	document.querySelector("div[data-element='fileSelector']").className = "hidden";
 	document.querySelector("div[data-element='serviceSelector']").className = "hidden";	
@@ -347,7 +363,8 @@ function submitToWorker(compiledXML) {
 	chrome.runtime.sendMessage({
 		xmlString: compiledXML, 
 		storyID: id, 
-		divider: document.getElementById("dividerInput").value
+		divider: document.getElementById("dividerInput").value,
+		delete: document.getElementById("deleteCheckbox").checked ? true : false
 	}, function(response) {
 		displayMessage(response.farewell);
 	}); 
