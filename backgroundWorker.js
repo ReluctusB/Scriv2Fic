@@ -199,8 +199,8 @@ function makeChapter(chapterTitle, chapterBody) {
 		xhttp.send(requestBody);
 	}
 
-	setTimeout(()=>createChapter(chapterTitle), 250);
-	//console.log(chapterBody);
+	//setTimeout(()=>createChapter(chapterTitle), 250);
+	console.log(chapterBody);
 }
 
 /* Creates a Chrome notification */
@@ -272,8 +272,42 @@ function convertCompile(xmlString, dividerString) {
 
 /* Converts RTF document strings into BBCode. */
 function rtfToBBCode (rtfIn) {
+	if (rtfIn.includes("\\pgnstarts0")) {
+		const splitRTF = rtfIn.split("\\pgnstarts0", 2);
+		return bbConvertWin(splitRTF);
+	} else {
+		const splitRTF = rtfIn.split(/\\pard.*$/m, 2);
+		return bbConvertMac(splitRTF);
+	}	
+}
 
-	/* Converts RGB arrays ([R, G, B]) into hex colour values */
+/* Listens for the content script (addService.js) to give it an xml document it can work on. */
+chrome.runtime.onMessage.addListener(
+	function(request, sender, sendResponse) {
+	    if (request.xmlString && request.storyID) {
+	    	storyID = request.storyID;
+	    	if (!request.delete) {
+	    		convertCompile(request.xmlString, request.divider);
+	    	} else {
+	    		deleteExistingChapters(()=>convertCompile(request.xmlString, request.divider));
+	    	}
+		    sendResponse({
+		    	farewell: "<h1 style='font-size:2rem;font-weight:bold;'>Spike, take a letter!</h1>"
+		    	+"<span style='font-weight:bold;'>Your document is now being processed into BBCode and sent to Fimfiction.</span><br><br>"
+		    	+"This may take a little while, but don't worry! "
+		    	+"You can safely navigate away from this page, and we'll alert you when we're done."
+		    });
+		} else {
+			sendResponse({
+		    	farewell: "<h1 style='font-size:2rem;font-weight:bold;'>I just don't know what went wrong!</h1>"
+		    	+"Something broke somewhere along the line. If you're seeing this, please contact user "
+		    	+"<a href='https://www.fimfiction.net/user/34408/RB_>RB_</a> and tell him he messed up."
+		    });
+		}
+	}
+);
+
+/* Converts RGB arrays ([R, G, B]) into hex colour values */
 	function rgbToHex(rgbArray) {
 		outStr = "#"
 		rgbArray.forEach(val => {
@@ -283,8 +317,39 @@ function rtfToBBCode (rtfIn) {
 		return outStr;
 	}
 
-	const splitRTF = rtfIn.split("\\pgnstarts0", 2);
+function bbConvertMac(splitRTF) {
+	let hexColourTable = [];
+	splitRTF[0].match(/{\\colortbl;.+(?=;})/)[0].replace("{\\colortbl;","").split(";").forEach(pallet => {
+		hexColourTable.push(rgbToHex(pallet.replace("\\red","").replace("green","").replace("blue","").split("\\")));
+	});
 
+	let outputString = "";
+
+	const paragraphs = splitRTF[1].match(/^.*$/gm);
+	paragraphs.forEach(paragraph => {
+		let contents = paragraph;
+		contents = contents.replace(/\\$/gm, "\\n");
+
+		contents = contents.replace(/\\/g, "⚐Ï⚑");
+
+		contents = contents
+			.replace("⚐Ï⚑{⚐Ï⚑⚐Ï⚑Scrv_ps=", "[quote]")
+			.replace("⚐Ï⚑⚐Ï⚑end_Scrv_ps⚐Ï⚑", "[/quote]")
+			.replace(/⚐Ï⚑hich⚐Ï⚑f\d ⚐Ï⚑emdash ⚐Ï⚑loch⚐Ï⚑f\d /g,"—")
+			.replace(/⚐Ï⚑tab /g, "\\t")
+			.replace(/"/g, `\\"`)
+			.replace(/}/g, `\\}`);
+
+		//Return all remaining instances of the unicode string back to backslashes.
+		contents = contents.replace(/(⚐Ï⚑){1,2}/g, "\\\\");
+
+		outputString += contents;
+	});	
+
+	return outputString;
+}
+
+function bbConvertWin(splitRTF) {
 	let hexColourTable = [];
 	splitRTF[0].match(/{\\colortbl;.+(?=;})/)[0].replace("{\\colortbl;","").split(";").forEach(pallet => {
 		hexColourTable.push(rgbToHex(pallet.replace("\\red","").replace("green","").replace("blue","").split("\\")));
@@ -558,29 +623,3 @@ function rtfToBBCode (rtfIn) {
 	}
 	return outputString;
 }
-
-/* Listens for the content script (addService.js) to give it an xml document it can work on. */
-chrome.runtime.onMessage.addListener(
-	function(request, sender, sendResponse) {
-	    if (request.xmlString && request.storyID) {
-	    	storyID = request.storyID;
-	    	if (!request.delete) {
-	    		convertCompile(request.xmlString, request.divider);
-	    	} else {
-	    		deleteExistingChapters(()=>convertCompile(request.xmlString, request.divider));
-	    	}
-		    sendResponse({
-		    	farewell: "<h1 style='font-size:2rem;font-weight:bold;'>Spike, take a letter!</h1>"
-		    	+"<span style='font-weight:bold;'>Your document is now being processed into BBCode and sent to Fimfiction.</span><br><br>"
-		    	+"This may take a little while, but don't worry! "
-		    	+"You can safely navigate away from this page, and we'll alert you when we're done."
-		    });
-		} else {
-			sendResponse({
-		    	farewell: "<h1 style='font-size:2rem;font-weight:bold;'>I just don't know what went wrong!</h1>"
-		    	+"Something broke somewhere along the line. If you're seeing this, please contact user "
-		    	+"<a href='https://www.fimfiction.net/user/34408/RB_>RB_</a> and tell him he messed up."
-		    });
-		}
-	}
-);

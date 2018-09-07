@@ -1,6 +1,7 @@
 /* --Globals-- */
 let files;
 let lowLevel = 0;
+let versionString;
 
 /* Builds HTML elements according to a properties object (propObj) */
 function eleBuilder(eleStr, propObj) {
@@ -159,6 +160,7 @@ function buildDirectory(scrivx) {
 		const scrivxContents = evt.target.result;
 		const parser = new DOMParser();
 		const xmlDoc = parser.parseFromString(scrivxContents, "text/xml");
+		versionString = xmlDoc.getElementsByTagName("ScrivenerProject")[0].getAttribute("Creator");
 		document.getElementById("scrivTitle").innerText = scrivx.name.replace(".scrivx","");
 		const topLevelFiles = xmlDoc.querySelectorAll("Binder > BinderItem[Type=DraftFolder]");
 		buildHierarchy(topLevelFiles, 0);
@@ -360,11 +362,13 @@ function displayMessage(message) {
 then displays the response via displayMessage. */
 function submitToWorker(compiledXML) {
 	const id = window.location.pathname.match(/\d+/)[0];
+	console.log(compiledXML);
 	chrome.runtime.sendMessage({
 		xmlString: compiledXML, 
 		storyID: id, 
 		divider: document.getElementById("dividerInput").value,
-		delete: document.getElementById("deleteCheckbox").checked ? true : false
+		delete: document.getElementById("deleteCheckbox").checked ? true : false,
+		version: versionString
 	}, function(response) {
 		displayMessage(response.farewell);
 	}); 
