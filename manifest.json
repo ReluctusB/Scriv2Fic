@@ -1,7 +1,10 @@
 {
    "background": {
     	"persistent": false,
-    	"scripts": [ "backgroundWorker.js" ]
+    	"scripts": [ 
+        "rtfParser.js",
+        "backgroundWorker.js" 
+      ]
    },
    "content_scripts": [ {
     	"js": [ "addService.js" ],
