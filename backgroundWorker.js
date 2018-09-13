@@ -274,18 +274,18 @@ function convertCompile(xmlString, dividerString) {
 chrome.runtime.onMessage.addListener(
 	function(request, sender, sendResponse) {
 	    if (request.xmlString && request.storyID) {
+	    	sendResponse({
+		    	farewell: "<h1 style='font-size:2rem;font-weight:bold;'>Spike, take a letter!</h1>"
+		    	+"<span style='font-weight:bold;'>Your document is now being processed into BBCode and sent to Fimfiction.</span><br><br>"
+		    	+"This may take a little while, but don't worry! "
+		    	+"You can safely navigate away from this page, and we'll alert you when we're done."
+		    });
 	    	storyID = request.storyID;
 	    	if (!request.delete) {
 	    		convertCompile(request.xmlString, request.divider);
 	    	} else {
 	    		deleteExistingChapters(()=>convertCompile(request.xmlString, request.divider));
 	    	}
-		    sendResponse({
-		    	farewell: "<h1 style='font-size:2rem;font-weight:bold;'>Spike, take a letter!</h1>"
-		    	+"<span style='font-weight:bold;'>Your document is now being processed into BBCode and sent to Fimfiction.</span><br><br>"
-		    	+"This may take a little while, but don't worry! "
-		    	+"You can safely navigate away from this page, and we'll alert you when we're done."
-		    });
 		} else {
 			sendResponse({
 		    	farewell: "<h1 style='font-size:2rem;font-weight:bold;'>I just don't know what went wrong!</h1>"

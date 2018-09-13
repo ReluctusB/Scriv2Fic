@@ -2,23 +2,25 @@
 
 class RTFObj {
 	constructor(parent) {
-		this.parent = parent || undefined;
+		this.parent = parent;
 		this.style = {};
+		this.type = "";
 	}
 }
 
 class RTFDoc extends RTFObj {
 	constructor(parent) {
-		super(parent);
+		super(null);
 		this.contents = [];
 		this.colourTable = [];
 		this.listTable = [];
 		this.listOverrideTable = [];
+		this.type = "Document";
 	}
 	dumpContents() {
 		return {
 			colourtable: this.colourTable,
-			listTable: this.listTable,
+			listtable: this.listTable,
 			listoverridetable: this.listOverrideTable,
 			style: this.style,
 			contents: this.contents
@@ -26,37 +28,28 @@ class RTFDoc extends RTFObj {
 	}
 }
 
-class RTFParagraph extends RTFObj {
-	constructor(parent) {
+class RTFGroup extends RTFObj {
+	constructor(parent, type) {
 		super(parent);
 		this.contents = [];
 		this.attributes = {};
+		this.type = type;
 	}
-	dumpContents(parent) {
-		parent.contents.push({
+	dumpContents() {
+		if (this.contents.length === 1 && this.contents[0] instanceof String) {
+			this.contents = this.contents[0];
+			this.type = "text";
+		}
+		this.parent.contents.push({
 			contents: this.contents,
 			style: this.style,
 			attributes: this.attributes,
+			type: this.type
 		});
 	}
 }
 
-class RTFSubgroup extends RTFObj {
-	constructor(parent) {
-		super(parent);
-		this.text = "";
-		this.attributes = {};
-	}
-	dumpContents(parent) {
-		parent.contents.push({
-			text: this.text,
-			style: this.style,
-			attributes: this.attributes,
-		});
-	}
-}
-
-class RTFRibosome {
+class SmallRTFRibosomalSubunit {
 	constructor() {
 		this.rtfString = "";
 		this.curInstruction = {type: "", value: ""};
@@ -93,13 +86,15 @@ class RTFRibosome {
 				break;
 			case "{": 
 				this.setInstruction();
-				this.curInstruction.type = "groupStart";
-				this.setInstruction();
+				this.setInstruction({type:"groupStart"});
 				break;
 			case "}": 
 				this.setInstruction();
-				this.curInstruction.type = "groupEnd";
+				this.setInstruction({type:"groupEnd"});
+				break;
+			case "\n": 
 				this.setInstruction();
+				this.setInstruction({type:"break"});
 				break;
 			default: 
 				this.curInstruction.type = "text";
@@ -107,18 +102,21 @@ class RTFRibosome {
 		}
 	}
 	parseEscape(char) {
-		if (char !== "\\" && char !== "{" && char !== "}") {
+		if (char.search(/[ \\{}\n]/) === -1) {
 			this.setInstruction();
 			this.operation = this.parseControl;
 			this.parseControl(char);
 		} else {
 			this.operation = this.parseText;
-			this.curInstruction.type = "text";
-			this.curInstruction.value += char;
+			this.parseText(char);
 		}
 	}
 	parseControl(char) {
-		if (char.search(/[ \\{}\t]/) === -1) {
+		if (char.search(/[ \\{}\t'\n]/) === -1) {
+			this.curInstruction.type = "control";
+			this.curInstruction.value += char;
+		} else if (char === "'") {
+			this.operation = this.parseHex;
 			this.curInstruction.type = "control";
 			this.curInstruction.value += char;
 		} else {
@@ -127,37 +125,101 @@ class RTFRibosome {
 			this.parseText(char);
 		}
 	}
-	setInstruction() {
-		if (this.curInstruction.type !== "") {
-			this.output.push(this.curInstruction);
+	parseHex(char) {
+		if (this.curInstruction.value.length >= 3) {
+			this.setInstruction();
+			this.operation = this.parseText;
+			this.parseText(char);
+		} else {
+			this.curInstruction.value += char;
+		}
+	}
+	setInstruction(instruction = this.curInstruction) {
+		if (instruction.type !== "") {
+			this.output.push(instruction);
 			this.curInstruction = {type: "", value: ""};
 		}
 	}
 }
 
+class LargeRTFRibosomalSubunit {
+	constructor() {
+		this.instructions = [];
+		this.curInstruction = {};
+		this.output = {};
+		this.curState = {};
+		this.curIndex = 0;
+		this.defState = {};
+		this.doc = new RTFDoc;
+		this.curGroup = this.doc;
+		this.working = false;
+	}
+	synthesize(rtfInstructions) {
+		this.instructions = rtfInstructions;
+		this.output = {};
+		this.curState = {};
+		this.curIndex = 0;
+		this.defState = {};
+		this.doc = new RTFDoc;
+		this.curGroup = this.doc;
+		this.working = true;
+		while (this.working === true) {
+			if (this.curInstruction.type === "control") {
+				this.parseInstruction(this.curInstruction);
+			}
+			this.followInstruction(this.curInstruction);
+			this.advancePos();
+		}
+		this.output = this.doc.dumpContents();
+	}
+	advancePos() {
+		this.curIndex++;
+		if (this.curIndex < this.instructions.length) {
+			this.curInstruction = this.instructions[this.curIndex];
+		} else {
+			this.working = false;
+		}
+	}
+	followInstruction(instruction) {
+		switch(instruction.type) {
+			case "control":
+				parseControl(instruction);
+				break;
+			case "text":
+				this.curGroup.contents.push(instruction.value);
+				break;
+			case "groupStart":
+				this.newGroup("span");
+				break;
+			case "groupEnd":
+				this.endGroup();
+				break;
+			case "break":
+				break;
+		}
+	}
+	parseControl(instruction) {
 
-
-function RTFToObjectTree(rtfString) {
-	const doc = new RTFDoc();
-	const currentState = {};
-	const defaultState = {};
-	const outputObject = {};
-	ribosome = new RTFRibosome;
-	ribosome.spool(rtfString)
-	console.log(ribosome.working);
-	console.log(ribosome.output);
-
-	outputObject.document = doc.dumpContents();
-	return outputObject
-
-}
-
-function objectTreeToBBCode(objectTree) {
-
+	}
+	newGroup(type) {
+		this.curGroup = new RTFGroup(this.curGroup, type);
+	}
+	endGroup() {
+		this.curGroup.dumpContents();
+		if (this.curGroup.parent) {
+			this.curGroup = this.curGroup.parent;
+		}
+	}
 }
 
 function rtfToBBCode(rtfString) {
-	RTFToObjectTree(rtfString);
+	reader = new SmallRTFRibosomalSubunit;
+	writer = new LargeRTFRibosomalSubunit;
+	reader.spool(rtfString);
+	console.log(reader.output);
+	writer.synthesize(reader.output);
+	const rtfDOM = writer.output;
+	console.log(rtfDOM);
 }
 
 
