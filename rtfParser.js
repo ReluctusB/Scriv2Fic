@@ -13,6 +13,7 @@ class RTFDoc extends RTFObj {
 		super(null);
 		this.contents = [];
 		this.colourTable = [];
+		this.fontTable = [];
 		this.listTable = [];
 		this.listOverrideTable = [];
 		this.type = "Document";
@@ -20,6 +21,7 @@ class RTFDoc extends RTFObj {
 	dumpContents() {
 		return {
 			colourtable: this.colourTable,
+			fonttable: this.fontTable,
 			listtable: this.listTable,
 			listoverridetable: this.listOverrideTable,
 			style: this.style,
@@ -36,7 +38,7 @@ class RTFGroup extends RTFObj {
 		this.type = type;
 	}
 	dumpContents() {
-		if (this.contents.length === 1 && this.contents[0] instanceof String) {
+		if (this.contents.length === 1 && typeof this.contents[0] === "string") {
 			this.contents = this.contents[0];
 			this.type = "text";
 		}
@@ -46,6 +48,29 @@ class RTFGroup extends RTFObj {
 			attributes: this.attributes,
 			type: this.type
 		});
+	}
+}
+
+class DocTable {
+	constructor(doc) {
+		this.doc = doc;
+		this.table = [];
+	}
+}
+
+class ColorTable extends DocTable {
+	constructor(doc) {
+		super(doc);
+		this.table = ["woop"];
+		this.rgb = {red: 0, green: 0, blue: 0};
+	}
+	flush() {
+		this.table.push(this.rgb);
+		this.rgb = {red: 0, green: 0, blue: 0}
+	}
+	dumpContents() {
+		console.log("Help!");
+		this.doc.colourTable = this.table;
 	}
 }
 
@@ -112,13 +137,19 @@ class SmallRTFRibosomalSubunit {
 		}
 	}
 	parseControl(char) {
-		if (char.search(/[ \\{}\t'\n]/) === -1) {
+		if (char.search(/[ \\{}\t'\n;]/) === -1) {
 			this.curInstruction.type = "control";
 			this.curInstruction.value += char;
 		} else if (char === "'") {
 			this.operation = this.parseHex;
 			this.curInstruction.type = "control";
 			this.curInstruction.value += char;
+		} else if (char === " ") {
+			this.setInstruction();
+			this.operation = this.parseText;
+		} else if (char === ";") {
+			this.setInstruction();
+			this.setInstruction({type: "listBreak"});
 		} else {
 			this.setInstruction();
 			this.operation = this.parseText;
@@ -149,7 +180,7 @@ class LargeRTFRibosomalSubunit {
 		this.output = {};
 		this.curState = {};
 		this.curIndex = 0;
-		this.defState = {};
+		this.defState = {font:0,fontsize:22,bold:false,italics:false};
 		this.doc = new RTFDoc;
 		this.curGroup = this.doc;
 		this.working = false;
@@ -159,14 +190,11 @@ class LargeRTFRibosomalSubunit {
 		this.output = {};
 		this.curState = {};
 		this.curIndex = 0;
-		this.defState = {};
+		this.defState = {font:0,fontsize:22,bold:false,italics:false};
 		this.doc = new RTFDoc;
 		this.curGroup = this.doc;
 		this.working = true;
 		while (this.working === true) {
-			if (this.curInstruction.type === "control") {
-				this.parseInstruction(this.curInstruction);
-			}
 			this.followInstruction(this.curInstruction);
 			this.advancePos();
 		}
@@ -183,7 +211,7 @@ class LargeRTFRibosomalSubunit {
 	followInstruction(instruction) {
 		switch(instruction.type) {
 			case "control":
-				parseControl(instruction);
+				this.parseControl(instruction.value);
 				break;
 			case "text":
 				this.curGroup.contents.push(instruction.value);
@@ -194,15 +222,28 @@ class LargeRTFRibosomalSubunit {
 			case "groupEnd":
 				this.endGroup();
 				break;
+			case "listBreak":
+				this.curGroup.flush();
+				break;
 			case "break":
 				break;
 		}
 	}
 	parseControl(instruction) {
-
+		const numPos = instruction.search(/\d/);
+		let val = null;
+		if (numPos !== -1) {
+			val = parseInt(instruction.substr(numPos));
+			instruction = instruction.substr(0,numPos);
+		}
+		const command = "cmd$" + instruction;
+		if (this[command]) {
+			this[command](val);
+		}
 	}
 	newGroup(type) {
 		this.curGroup = new RTFGroup(this.curGroup, type);
+		this.curGroup.style = this.getStyle(this.curGroup.parent);
 	}
 	endGroup() {
 		this.curGroup.dumpContents();
@@ -210,7 +251,85 @@ class LargeRTFRibosomalSubunit {
 			this.curGroup = this.curGroup.parent;
 		}
 	}
+	setStyle(style) {
+		this.curGroup.style = style;
+		this.curState = style;
+	}
+	getStyle(group) {
+		return JSON.parse(JSON.stringify(group.style));
+	}
+
+	cmd$par() {
+		if (this.curGroup.type === "paragraph") {
+			const prevStyle = this.curGroup.style;
+			this.endGroup()
+			this.newGroup("paragraph");
+			this.setStyle(prevStyle);
+		} else {
+			this.newGroup("paragraph");
+		}	
+	}
+	cmd$pard() {
+		if (this.curGroup.type === "paragraph") {
+			this.setStyle(this.defState);
+		} else {
+			this.newGroup("paragraph");
+			this.setStyle(this.defState);
+		}
+	}
+	cmd$plain() {
+		this.setStyle(this.defState);
+	}
+
+	cmd$i(val) {
+		this.curGroup.style.italics = val !== 0;
+	}
+	cmd$b(val) {
+		this.curGroup.style.bold = val !== 0;
+	}
+	cmd$strike(val) {
+		this.curGroup.style.strikethrough = val !== 0;
+	}
+	cmd$scaps(val) {
+		this.curGroup.style.smallcaps = val !== 0;
+	}
+	cmd$ul(val) {
+		this.curGroup.style.underline = val !== 0;
+	}
+	cmd$ulnone(val) {
+		this.curGroup.style.underline = false;
+	}
+
+	cmd$f(val) {
+		this.curGroup.style.font = val;
+	}
+	cmd$fs(val) {
+		this.curGroup.style.fontsize = val;
+	}
+
+	cmd$fonttbl() {
+		this.curGroup.type = "fonttable";
+	}
+
+	cmd$colortbl() {
+		this.curGroup = new ColourTable(this.doc);
+	}
+
+	cmd$listtable() {
+		this.curGroup.type = "listtable";
+	}
+
+	cmd$listoverridetable() {
+		this.curGroup.type = "listoverridetable";
+	}
+
+	cmd$listtext(val) {
+		this.curGroup.attributes.listtext = true;
+	}
 }
+
+
+
 
 function rtfToBBCode(rtfString) {
 	reader = new SmallRTFRibosomalSubunit;
