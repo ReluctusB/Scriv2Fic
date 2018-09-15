@@ -58,15 +58,18 @@ class DocTable {
 	}
 }
 
-class ColorTable extends DocTable {
+class ColourTable extends DocTable {
 	constructor(doc) {
 		super(doc);
-		this.table = ["woop"];
-		this.rgb = {red: 0, green: 0, blue: 0};
+		this.table = [];
+		this.rgb = {};
 	}
-	flush() {
-		this.table.push(this.rgb);
-		this.rgb = {red: 0, green: 0, blue: 0}
+	addColour(colour, value) {
+		this.rgb[colour] = value;
+		if (Object.keys(this.rgb).length === 3) {
+			this.table.push(this.rgb);
+			this.rgb = {};
+		}
 	}
 	dumpContents() {
 		console.log("Help!");
@@ -144,12 +147,9 @@ class SmallRTFRibosomalSubunit {
 			this.operation = this.parseHex;
 			this.curInstruction.type = "control";
 			this.curInstruction.value += char;
-		} else if (char === " ") {
+		} else if (char === " " || char === ";") {
 			this.setInstruction();
 			this.operation = this.parseText;
-		} else if (char === ";") {
-			this.setInstruction();
-			this.setInstruction({type: "listBreak"});
 		} else {
 			this.setInstruction();
 			this.operation = this.parseText;
@@ -222,9 +222,6 @@ class LargeRTFRibosomalSubunit {
 			case "groupEnd":
 				this.endGroup();
 				break;
-			case "listBreak":
-				this.curGroup.flush();
-				break;
 			case "break":
 				break;
 		}
@@ -242,7 +239,11 @@ class LargeRTFRibosomalSubunit {
 		}
 	}
 	newGroup(type) {
-		this.curGroup = new RTFGroup(this.curGroup, type);
+		if (this.curGroup instanceof RTFGroup) {
+			this.curGroup = new RTFGroup(this.curGroup, type);
+		} else {
+			this.curGroup = new RTFGroup(this.doc, type);
+		}	
 		this.curGroup.style = this.getStyle(this.curGroup.parent);
 	}
 	endGroup() {
@@ -256,7 +257,11 @@ class LargeRTFRibosomalSubunit {
 		this.curState = style;
 	}
 	getStyle(group) {
-		return JSON.parse(JSON.stringify(group.style));
+		if (group.style) {
+			return JSON.parse(JSON.stringify(group.style));
+		} else {
+			return this.defState;
+		}	
 	}
 
 	cmd$par() {
@@ -313,6 +318,22 @@ class LargeRTFRibosomalSubunit {
 
 	cmd$colortbl() {
 		this.curGroup = new ColourTable(this.doc);
+	}
+
+	cmd$red(val) {
+		if (this.curGroup instanceof ColourTable) {
+			this.curGroup.addColour("red", val);
+		}
+	}
+	cmd$blue(val) {
+		if (this.curGroup instanceof ColourTable) {
+			this.curGroup.addColour("blue", val);
+		}
+	}
+	cmd$green(val) {
+		if (this.curGroup instanceof ColourTable) {
+			this.curGroup.addColour("green", val);
+		}
 	}
 
 	cmd$listtable() {
