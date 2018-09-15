@@ -39,11 +39,11 @@ class RTFGroup extends RTFObj {
 	dumpContents() {
 		if (this.contents.length === 1 && typeof this.contents[0] === "string") {
 			this.contents = this.contents[0];
-			this.type = "text";
+			if (this.type === "span") {this.type = "text";}
 		}
 		this.parent.contents.push({
 			contents: this.contents,
-			style: this.style,
+			style: JSON.parse(JSON.stringify(this.style)),
 			attributes: this.attributes,
 			type: this.type
 		});
@@ -355,7 +355,7 @@ class LargeRTFRibosomalSubunit {
 
 	cmd$par() {
 		if (this.curGroup.type === "paragraph") {
-			const prevStyle = this.curGroup.style;
+			const prevStyle = this.getStyle(this.curGroup);
 			this.endGroup()
 			this.newGroup("paragraph");
 			this.setStyle(prevStyle);
@@ -373,6 +373,19 @@ class LargeRTFRibosomalSubunit {
 	}
 	cmd$plain() {
 		this.setStyle(this.defState);
+	}
+
+	cmd$qc() {
+		this.curGroup.style.align = "center";
+	}
+	cmd$qj() {
+		this.curGroup.style.align = "justify";
+	}
+	cmd$qr() {
+		this.curGroup.style.align = "right";
+	}
+	cmd$ql() {
+		this.curGroup.style.align = "left";
 	}
 
 	cmd$i(val) {
@@ -396,6 +409,9 @@ class LargeRTFRibosomalSubunit {
 
 	cmd$ilvl(val) {
 		this.curGroup.style.ilvl = val;
+	}
+	cmd$listtext(val) {
+		this.curGroup.type = "listtext";
 	}
 
 	cmd$f(val) {
@@ -572,10 +588,6 @@ class LargeRTFRibosomalSubunit {
 	}
 	cmd$listoverrideformat(val) {
 		this.curGroup.attributes.overrideformat = val;
-	}
-
-	cmd$listtext(val) {
-		this.curGroup.attributes.listtext = true;
 	}
 }
 
