@@ -8,6 +8,12 @@ class RTFObj {
 		this.contents = [];
 		this.type = "";
 	}
+	get curstyle() {
+		return JSON.parse(JSON.stringify(this.style));
+	}
+	get curattributes() {
+		return JSON.parse(JSON.stringify(this.attributes));
+	}
 }
 
 class RTFDoc extends RTFObj {
@@ -25,7 +31,7 @@ class RTFDoc extends RTFObj {
 			fonttable: this.fontTable,
 			listtable: this.listTable,
 			listoverridetable: this.listOverrideTable,
-			style: this.style,
+			style: this.curstyle,
 			contents: this.contents
 		};
 	}
@@ -43,8 +49,8 @@ class RTFGroup extends RTFObj {
 		}
 		this.parent.contents.push({
 			contents: this.contents,
-			style: JSON.parse(JSON.stringify(this.style)),
-			attributes: this.attributes,
+			style: this.curstyle,
+			attributes: this.curattributes,
 			type: this.type
 		});
 	}
@@ -102,7 +108,7 @@ class Font extends RTFObj{
 	dumpContents() {
 		this.parent.table.push({
 			fontname: this.contents[0].replace(";",""),
-			attributes: this.attributes
+			attributes: this.curattributes
 		});
 	}
 }
@@ -127,7 +133,7 @@ class List extends RTFObj {
 			templateid: this.templateid,
 			id: this.id,
 			levels: this.contents,
-			attributes: this.attributes,
+			attributes: this.curattributes,
 		});
 	}
 }
@@ -138,8 +144,8 @@ class ListLevel extends RTFObj{
 	}
 	dumpContents() {
 		this.parent.contents.push({
-			style:this.style,
-			attributes: this.attributes,
+			style:this.curstyle,
+			attributes: this.curattributes,
 		});
 	}
 }
@@ -161,7 +167,7 @@ class ListOverride extends RTFObj {
 	}
 	dumpContents() {
 		this.parent.table.push({
-			attributes: this.attributes,
+			attributes: this.curattributes,
 			id: this.id,
 			ls: this.ls
 		});
@@ -331,7 +337,7 @@ class LargeRTFRibosomalSubunit {
 	}
 	newGroup(type) {
 		this.curGroup = new RTFGroup(this.curGroup, type);
-		this.curGroup.style = this.getStyle(this.curGroup.parent);
+		this.curGroup.style = this.curGroup.parent.style ? this.curGroup.parent.curstyle : this.defStyle;
 	}
 	endGroup() {
 		this.curGroup.dumpContents();
@@ -345,17 +351,10 @@ class LargeRTFRibosomalSubunit {
 		this.curGroup.style = style;
 		this.curState = style;
 	}
-	getStyle(group) {
-		if (group.style) {
-			return JSON.parse(JSON.stringify(group.style));
-		} else {
-			return this.defState;
-		}	
-	}
 
 	cmd$par() {
 		if (this.curGroup.type === "paragraph") {
-			const prevStyle = this.getStyle(this.curGroup);
+			const prevStyle = this.curGroup.curstyle;
 			this.endGroup()
 			this.newGroup("paragraph");
 			this.setStyle(prevStyle);
