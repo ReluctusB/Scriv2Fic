@@ -4,6 +4,8 @@ class RTFObj {
 	constructor(parent) {
 		this.parent = parent;
 		this.style = {};
+		this.attributes = {};
+		this.contents = [];
 		this.type = "";
 	}
 }
@@ -11,7 +13,6 @@ class RTFObj {
 class RTFDoc extends RTFObj {
 	constructor(parent) {
 		super(null);
-		this.contents = [];
 		this.colourTable = [];
 		this.fontTable = [];
 		this.listTable = [];
@@ -33,8 +34,6 @@ class RTFDoc extends RTFObj {
 class RTFGroup extends RTFObj {
 	constructor(parent, type) {
 		super(parent);
-		this.contents = [];
-		this.attributes = {};
 		this.type = type;
 	}
 	dumpContents() {
@@ -48,6 +47,18 @@ class RTFGroup extends RTFObj {
 			attributes: this.attributes,
 			type: this.type
 		});
+	}
+}
+
+class parameterGroup extends RTFObj {
+	constructor (parent, parameter) {
+		super(parent);
+		this.param = parameter;
+	}
+	dumpContents() {
+		if (this.contents[0]) {
+			this.parent.attributes[this.param] = this.contents[0].replace(";","");
+		}		
 	}
 }
 
@@ -84,16 +95,75 @@ class FontTable extends DocTable {
 	}
 }
 
-class Font {
+class Font extends RTFObj{
 	constructor(parent) {
-		this.parent = parent;
-		this.attributes = {};
-		this.contents = [];
+		super(parent);
 	}
 	dumpContents() {
 		this.parent.table.push({
 			fontname: this.contents[0].replace(";",""),
 			attributes: this.attributes
+		});
+	}
+}
+
+class ListTable extends DocTable {
+	constructor(doc) {
+		super(doc);
+	}
+	dumpContents() {
+		this.doc.listTable = this.table;
+	}
+}
+
+class List extends RTFObj {
+	constructor (parent) {
+		super(parent);
+		this.templateid = null;
+		this.id = null;
+	}
+	dumpContents() {
+		this.parent.table.push({
+			templateid: this.templateid,
+			id: this.id,
+			levels: this.contents,
+			attributes: this.attributes,
+		});
+	}
+}
+
+class ListLevel extends RTFObj{
+	constructor (parent) {
+		super(parent);
+	}
+	dumpContents() {
+		this.parent.contents.push({
+			style:this.style,
+			attributes: this.attributes,
+		});
+	}
+}
+
+class ListOverrideTable extends DocTable {
+	constructor(doc) {
+		super(doc);
+	}
+	dumpContents() {
+		this.doc.listOverrideTable = this.table;
+	}
+}
+
+class ListOverride extends RTFObj {
+	constructor(parent) {
+		super(parent);
+		this.id = null;
+		this.ls = null;
+	}
+	dumpContents() {
+		this.parent.table.push({
+			attributes: this.attributes,
+			id: this.id,
+			ls: this.ls
 		});
 	}
 }
@@ -324,8 +394,12 @@ class LargeRTFRibosomalSubunit {
 		this.curGroup.style.underline = false;
 	}
 
+	cmd$ilvl(val) {
+		this.curGroup.style.ilvl = val;
+	}
+
 	cmd$f(val) {
-		if (this.curGroup.parent instanceof RTFGroup) {
+		if (this.curGroup.parent instanceof RTFObj) {
 			this.curGroup.style.font = val;
 		} else if (this.curGroup.parent instanceof FontTable) {
 			this.curGroup = new Font(this.curGroup.parent);
@@ -394,11 +468,110 @@ class LargeRTFRibosomalSubunit {
 	}
 
 	cmd$listtable() {
-		this.curGroup.type = "listtable";
+		this.curGroup = new ListTable(this.doc);
+	}
+
+	cmd$list() {
+		this.curGroup = new List(this.curGroup.parent);
+	}
+	cmd$listid(val) {
+		this.curGroup.id = val;
+	}
+	cmd$listtemplateid(val) {
+		this.curGroup.templateid = val;
+	}
+	cmd$listsimple(val) {
+		this.curGroup.attributes.simple = val;
+	}
+	cmd$listhybrid(val) {
+		this.curGroup.attributes.hybrid = true;
+	}
+	cmd$listname() {
+		this.curGroup = new parameterGroup(this.curGroup.parent, "listname");
+	}
+	cmd$liststyleid(val) {
+		this.curGroup.attributes.styleid = val;
+	}
+	cmd$liststylename(val) {
+		this.curGroup.attributes.stylename = val;
+	}
+	cmd$liststartat(val) {
+		this.curGroup.attributes.startat = val;
+	}
+	cmd$lvltentative() {
+		this.curGroup.attributes.lvltentative = true;
+	}
+
+	cmd$listlevel() {
+		this.curGroup = new ListLevel(this.curGroup.parent);
+	}
+	cmd$levelstartat(val) {
+		this.curGroup.attributes.startat = val;
+	}
+	cmd$levelnfc(val) {
+		this.curGroup.attributes.nfc = val;
+	}
+	cmd$levelnfcn(val) {
+		this.curGroup.attributes.nfcn = val;
+	}
+	cmd$leveljc(val) {
+		this.curGroup.attributes.jc = val;
+	}
+	cmd$leveljcn(val) {
+		this.curGroup.attributes.jcn = val;
+	}
+	cmd$leveltext() {
+		this.curGroup = new parameterGroup(this.curGroup.parent, "leveltext");
+	}
+	cmd$levelnumbers(val) {
+		this.curGroup = new parameterGroup(this.curGroup.parent, "levelnumbers");
+	}
+	cmd$levelfollow(val) {
+		this.curGroup.attributes.follow = val;
+	}
+	cmd$levellegal(val) {
+		this.curGroup.attributes.legal = val;
+	}
+	cmd$levelnorestart(val) {
+		this.curGroup.attributes.norestart = val;
+	}
+	cmd$levelold(val) {
+		this.curGroup.attributes.old = val;
+	}
+	cmd$levelprev(val) {
+		this.curGroup.attributes.prev = val;
+	}
+	cmd$levelprevspace(val) {
+		this.curGroup.attributes.prevspace = val;
+	}
+	cmd$levelindent(val) {
+		this.curGroup.attributes.indent = val;
+	}
+	cmd$levelspace(val) {
+		this.curGroup.attributes.space = val;
 	}
 
 	cmd$listoverridetable() {
-		this.curGroup.type = "listoverridetable";
+		this.curGroup = new ListOverrideTable(this.doc);
+	}
+	cmd$listoverride() {
+		this.curGroup = new ListOverride(this.curGroup.parent);
+	}
+	cmd$ls(val) {
+		if (this.curGroup instanceof ListOverride) {
+	      	this.curGroup.ls = val;
+	    } else {
+	      	this.curGroup.style.ls = val;
+	    }
+	}
+	cmd$listoverridecount(val) {
+		this.curGroup.attributes.overridecount = val;
+	}
+	cmd$listoverridestartat() {
+		this.curGroup.attributes.overridestartat = true;
+	}
+	cmd$listoverrideformat(val) {
+		this.curGroup.attributes.overrideformat = val;
 	}
 
 	cmd$listtext(val) {
