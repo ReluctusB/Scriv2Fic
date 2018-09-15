@@ -61,7 +61,6 @@ class DocTable {
 class ColourTable extends DocTable {
 	constructor(doc) {
 		super(doc);
-		this.table = [];
 		this.rgb = {};
 	}
 	addColour(colour, value) {
@@ -72,8 +71,30 @@ class ColourTable extends DocTable {
 		}
 	}
 	dumpContents() {
-		console.log("Help!");
 		this.doc.colourTable = this.table;
+	}
+}
+
+class FontTable extends DocTable {
+	constructor(doc) {
+		super(doc);
+	}
+	dumpContents() {
+		this.doc.fontTable = this.table;
+	}
+}
+
+class Font {
+	constructor(parent) {
+		this.parent = parent;
+		this.attributes = {};
+		this.contents = [];
+	}
+	dumpContents() {
+		this.parent.table.push({
+			fontname: this.contents[0].replace(";",""),
+			attributes: this.attributes
+		});
 	}
 }
 
@@ -239,17 +260,15 @@ class LargeRTFRibosomalSubunit {
 		}
 	}
 	newGroup(type) {
-		if (this.curGroup instanceof RTFGroup) {
-			this.curGroup = new RTFGroup(this.curGroup, type);
-		} else {
-			this.curGroup = new RTFGroup(this.doc, type);
-		}	
+		this.curGroup = new RTFGroup(this.curGroup, type);
 		this.curGroup.style = this.getStyle(this.curGroup.parent);
 	}
 	endGroup() {
 		this.curGroup.dumpContents();
 		if (this.curGroup.parent) {
 			this.curGroup = this.curGroup.parent;
+		} else {
+			this.curGroup = this.doc;
 		}
 	}
 	setStyle(style) {
@@ -306,20 +325,58 @@ class LargeRTFRibosomalSubunit {
 	}
 
 	cmd$f(val) {
-		this.curGroup.style.font = val;
+		if (this.curGroup.parent instanceof RTFGroup) {
+			this.curGroup.style.font = val;
+		} else if (this.curGroup.parent instanceof FontTable) {
+			this.curGroup = new Font(this.curGroup.parent);
+			this.curGroup.attributes.font = val;
+		}
+		
 	}
 	cmd$fs(val) {
 		this.curGroup.style.fontsize = val;
 	}
 
 	cmd$fonttbl() {
-		this.curGroup.type = "fonttable";
+		this.curGroup = new FontTable(this.doc);
+	}
+	cmd$fcharset(val) {
+		this.curGroup.attributes.charset = val;
+	}
+	cmd$fprq(val) {
+		this.curGroup.attributes.pitch = val;
+	}
+	cmd$fbias(val) {
+		this.curGroup.attributes.bias = val;
+	}
+	cmd$fnil() {
+		this.curGroup.attributes.family = "nil";
+	}
+	cmd$froman() {
+		this.curGroup.attributes.family = "roman";
+	}
+	cmd$fswiss() {
+		this.curGroup.attributes.family = "swiss";
+	}
+	cmd$fmodern() {
+		this.curGroup.attributes.family = "modern";
+	}
+	cmd$fscript() {
+		this.curGroup.attributes.family = "script";
+	}
+	cmd$fdecor() {
+		this.curGroup.attributes.family = "decor";
+	}
+	cmd$ftech() {
+		this.curGroup.attributes.family = "tech";
+	}
+	cmd$fbidi() {
+		this.curGroup.attributes.family = "bidi";
 	}
 
 	cmd$colortbl() {
 		this.curGroup = new ColourTable(this.doc);
 	}
-
 	cmd$red(val) {
 		if (this.curGroup instanceof ColourTable) {
 			this.curGroup.addColour("red", val);
