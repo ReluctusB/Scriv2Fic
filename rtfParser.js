@@ -1,5 +1,7 @@
 //Design inspired by: https://github.com/iarna/rtf-parser
 
+const win_1252 = ` !"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_\`abcdefghijklmnopqrstuvqxyz{|}~ €�‚ƒ„…†‡ˆ‰Š‹Œ�Ž��‘’“”•–—˜™š›œ�žŸ ¡¢£¤¥¦§¨©ª«¬­®¯°±²³´µ¶·¸¹º»¼½¾¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ`
+
 class RTFObj {
 	constructor(parent) {
 		this.parent = parent;
@@ -45,6 +47,9 @@ class RTFGroup extends RTFObj {
 	dumpContents() {
 		if (this.contents.length === 1 && typeof this.contents[0] === "string") {
 			this.contents = this.contents[0];
+			if (this.type === "span") {this.type = "text";}
+		} else if (this.contents[0] && this.contents.every(entry => typeof entry === "string")) {
+			this.contents = this.contents.join("");
 			if (this.type === "span") {this.type = "text";}
 		}
 		this.parent.contents.push({
@@ -243,7 +248,7 @@ class SmallRTFRibosomalSubunit {
 		} else if (char === "'") {
 			this.operation = this.parseHex;
 			this.curInstruction.type = "control";
-			this.curInstruction.value += char;
+			this.curInstruction.value += "hex";
 		} else if (char === " " || char === ";") {
 			this.setInstruction();
 			this.operation = this.parseText;
@@ -254,7 +259,7 @@ class SmallRTFRibosomalSubunit {
 		}
 	}
 	parseHex(char) {
-		if (this.curInstruction.value.length >= 3) {
+		if (this.curInstruction.value.length >= 5) {
 			this.setInstruction();
 			this.operation = this.parseText;
 			this.parseText(char);
@@ -405,6 +410,12 @@ class LargeRTFRibosomalSubunit {
 	cmd$ulnone(val) {
 		this.curGroup.style.underline = false;
 	}
+	cmd$cf(val) {
+		this.curGroup.style.foreground = this.doc.colourTable[val - 1];
+	}
+	cmd$cb(val) {
+		this.curGroup.style.background = this.doc.colourTable[val - 1];
+	}
 
 	cmd$ilvl(val) {
 		this.curGroup.style.ilvl = val;
@@ -412,6 +423,30 @@ class LargeRTFRibosomalSubunit {
 	cmd$listtext(val) {
 		this.curGroup.type = "listtext";
 	}
+
+	cmd$uc(val) {
+		if (this.curGroup.type !== "span") {
+			this.curGroup.uc = val
+		} else {
+			this.curGroup.parent.uc = val
+		}		
+	}
+	cmd$u(val) {
+		this.curGroup.contents.push(String.fromCharCode(parseInt(val)));
+		if(this.curGroup.uc) {
+			this.curIndex += this.curGroup.uc;
+		} else if (this.curGroup.parent.uc) {
+			this.curIndex += this.curGroup.parent.uc;
+		} else {
+			this.curIndex += 1;
+		}
+	}
+
+	cmd$hex(val) {
+        this.curGroup.contents.push(win_1252.charAt(parseInt(val, 16) - 32));
+	}
+
+
 
 	cmd$f(val) {
 		if (this.curGroup.parent instanceof RTFObj) {
