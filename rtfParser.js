@@ -45,10 +45,7 @@ class RTFGroup extends RTFObj {
 		this.type = type;
 	}
 	dumpContents() {
-		if (this.contents.length === 1 && typeof this.contents[0] === "string") {
-			this.contents = this.contents[0];
-			if (this.type === "span") {this.type = "text";}
-		} else if (this.contents[0] && this.contents.every(entry => typeof entry === "string")) {
+		if (this.contents[0] && this.contents.every(entry => typeof entry === "string")) {
 			this.contents = this.contents.join("");
 			if (this.type === "span") {this.type = "text";}
 		}
@@ -67,8 +64,11 @@ class parameterGroup extends RTFObj {
 		this.param = parameter;
 	}
 	dumpContents() {
+		if (this.contents[1] && this.contents.every(entry => typeof entry === "string")) {
+			this.contents = this.contents.join("");
+		}
 		if (this.contents[0]) {
-			this.parent.attributes[this.param] = this.contents[0].replace(";","");
+			this.parent[this.param] = this.contents[0].replace(/[;"]/g,"");
 		}		
 	}
 }
@@ -132,8 +132,10 @@ class List extends RTFObj {
 		super(parent);
 		this.templateid = null;
 		this.id = null;
+		this.listname = "";
 	}
 	dumpContents() {
+		this.attributes.listname = this.listname;
 		this.parent.table.push({
 			templateid: this.templateid,
 			id: this.id,
@@ -148,6 +150,8 @@ class ListLevel extends RTFObj{
 		super(parent);
 	}
 	dumpContents() {
+		this.attributes.leveltext = this.leveltext;
+		this.attributes.levelnumbers = this.levelnumbers;
 		this.parent.contents.push({
 			style:this.curstyle,
 			attributes: this.curattributes,
@@ -176,6 +180,35 @@ class ListOverride extends RTFObj {
 			id: this.id,
 			ls: this.ls
 		});
+	}
+}
+
+class Field extends RTFObj {
+	constructor(parent) {
+		super(parent);
+		this.fieldInst = "";
+		this.contents = "";
+		this.type = "field";
+	}
+	dumpContents() {
+		const fieldInstProps = this.fieldInst.split(" ");
+		this.attributes.fieldtype = fieldInstProps[0];
+		this.attributes.fieldvalue = fieldInstProps[1];
+		this.parent.contents.push({
+			attributes: this.curattributes,
+			contents: this.contents,
+			style: this.curstyle,
+			type: this.type
+		});
+	}
+}
+class Fldrslt extends RTFObj {
+	constructor(parent) {
+		super(parent);
+	}
+	dumpContents() {
+		this.parent.style = this.style;
+		this.parent.contents = this.contents[0];
 	}
 }
 
@@ -357,6 +390,7 @@ class LargeRTFRibosomalSubunit {
 		this.curState = style;
 	}
 
+	/* Paragraphs */
 	cmd$par() {
 		if (this.curGroup.type === "paragraph") {
 			const prevStyle = this.curGroup.curstyle;
@@ -379,6 +413,7 @@ class LargeRTFRibosomalSubunit {
 		this.setStyle(this.defState);
 	}
 
+	/* Alignment */
 	cmd$qc() {
 		this.curGroup.style.align = "center";
 	}
@@ -392,6 +427,7 @@ class LargeRTFRibosomalSubunit {
 		this.curGroup.style.align = "left";
 	}
 
+	/* Character Stylings */
 	cmd$i(val) {
 		this.curGroup.style.italics = val !== 0;
 	}
@@ -417,6 +453,7 @@ class LargeRTFRibosomalSubunit {
 		this.curGroup.style.background = this.doc.colourTable[val - 1];
 	}
 
+	/* Lists */
 	cmd$ilvl(val) {
 		this.curGroup.style.ilvl = val;
 	}
@@ -424,12 +461,27 @@ class LargeRTFRibosomalSubunit {
 		this.curGroup.type = "listtext";
 	}
 
+	/* Special Characters */
+	cmd$emdash() {
+		this.curGroup.contents.push("—");
+	}
+	cmd$endash() {
+		this.curGroup.contents.push("–");
+	}
+	cmd$tab() {
+		this.curGroup.contents.push("\t");
+	}
+	cmd$line() {
+		this.curGroup.contents.push("\n");
+	}
+
+	/* Unicode Characters */
 	cmd$uc(val) {
 		if (this.curGroup.type !== "span") {
 			this.curGroup.uc = val
 		} else {
 			this.curGroup.parent.uc = val
-		}		
+		}
 	}
 	cmd$u(val) {
 		this.curGroup.contents.push(String.fromCharCode(parseInt(val)));
@@ -442,12 +494,12 @@ class LargeRTFRibosomalSubunit {
 		}
 	}
 
+	/* Ascii Extended Characters (Windows 1252) */
 	cmd$hex(val) {
         this.curGroup.contents.push(win_1252.charAt(parseInt(val, 16) - 32));
 	}
 
-
-
+	/* Fonts */
 	cmd$f(val) {
 		if (this.curGroup.parent instanceof RTFObj) {
 			this.curGroup.style.font = val;
@@ -461,6 +513,18 @@ class LargeRTFRibosomalSubunit {
 		this.curGroup.style.fontsize = val;
 	}
 
+	/* Fields */
+	cmd$field() {
+		this.curGroup = new Field(this.curGroup.parent);
+	}
+	cmd$fldinst() {
+		this.curGroup = new parameterGroup(this.curGroup.parent, "fieldInst");
+	}
+	cmd$fldrslt() {
+		this.curGroup = new Fldrslt(this.curGroup.parent);
+	}
+
+	/* Font Table */
 	cmd$fonttbl() {
 		this.curGroup = new FontTable(this.doc);
 	}
@@ -498,6 +562,7 @@ class LargeRTFRibosomalSubunit {
 		this.curGroup.attributes.family = "bidi";
 	}
 
+	/* Colour Table */
 	cmd$colortbl() {
 		this.curGroup = new ColourTable(this.doc);
 	}
@@ -517,6 +582,7 @@ class LargeRTFRibosomalSubunit {
 		}
 	}
 
+	/* List Table */
 	cmd$listtable() {
 		this.curGroup = new ListTable(this.doc);
 	}
@@ -601,6 +667,7 @@ class LargeRTFRibosomalSubunit {
 		this.curGroup.attributes.space = val;
 	}
 
+	/* List Override Table */
 	cmd$listoverridetable() {
 		this.curGroup = new ListOverrideTable(this.doc);
 	}
