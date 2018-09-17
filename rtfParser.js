@@ -446,6 +446,16 @@ class LargeRTFRibosomalSubunit {
 	cmd$ulnone(val) {
 		this.curGroup.style.underline = false;
 	}
+	cmd$sub() {
+		this.curGroup.style.subscript = true;
+	}
+	cmd$super() {
+		this.curGroup.style.superscript = true;
+	}
+	cmd$nosupersub() {
+		this.curGroup.style.subscript = false;
+		this.curGroup.style.superscript = false;
+	}
 	cmd$cf(val) {
 		this.curGroup.style.foreground = this.doc.colourTable[val - 1];
 	}
