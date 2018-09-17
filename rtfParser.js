@@ -100,9 +100,17 @@ class ColourTable extends DocTable {
 class FontTable extends DocTable {
 	constructor(doc) {
 		super(doc);
+		this.attributes = {};
+		this.contents = [];
 	}
 	dumpContents() {
-		this.doc.fontTable = this.table;
+		if (!this.table[0] && this.contents[0]) {
+			this.table.push ({
+				fontname: this.contents[0].replace(";",""),
+				attributes: this.attributes
+			});
+		}
+		this.doc.fontTable = this.table;	
 	}
 }
 
@@ -318,6 +326,8 @@ class LargeRTFRibosomalSubunit {
 		this.defState = {font:0,fontsize:22,bold:false,italics:false};
 		this.doc = new RTFDoc;
 		this.curGroup = this.doc;
+		this.paraTypes = ["paragraph", "listitem", "fragment"];
+		this.textTypes = ["text", "listtext", "field"];
 		this.working = false;
 	}
 	synthesize(rtfInstructions) {
@@ -358,6 +368,8 @@ class LargeRTFRibosomalSubunit {
 				this.endGroup();
 				break;
 			case "break":
+				this.endGroup();
+				this.newGroup("fragment");
 				break;
 		}
 	}
@@ -392,7 +404,7 @@ class LargeRTFRibosomalSubunit {
 
 	/* Paragraphs */
 	cmd$par() {
-		if (this.curGroup.type === "paragraph") {
+		if (this.paraTypes.includes(this.curGroup.type)) {
 			const prevStyle = this.curGroup.curstyle;
 			this.endGroup()
 			this.newGroup("paragraph");
@@ -402,7 +414,7 @@ class LargeRTFRibosomalSubunit {
 		}	
 	}
 	cmd$pard() {
-		if (this.curGroup.type === "paragraph") {
+		if (this.paraTypes.includes(this.curGroup.type)) {
 			this.setStyle(this.defState);
 		} else {
 			this.newGroup("paragraph");
@@ -425,6 +437,14 @@ class LargeRTFRibosomalSubunit {
 	}
 	cmd$ql() {
 		this.curGroup.style.align = "left";
+	}
+
+	/* Text Direction */
+	cmd$rtlch() {
+		this.curGroup.style.direction = "rtl";
+	}
+	cmd$ltrch() {
+		this.curGroup.style.direction = "ltr";
 	}
 
 	/* Character Stylings */
@@ -466,6 +486,7 @@ class LargeRTFRibosomalSubunit {
 	/* Lists */
 	cmd$ilvl(val) {
 		this.curGroup.style.ilvl = val;
+		this.curGroup.type = "listitem";
 	}
 	cmd$listtext(val) {
 		this.curGroup.type = "listtext";
@@ -483,6 +504,9 @@ class LargeRTFRibosomalSubunit {
 	}
 	cmd$line() {
 		this.curGroup.contents.push("\n");
+	}
+	cmd$hrule() {
+		this.curGroup.contents.push({type:"hr"});
 	}
 
 	/* Unicode Characters */
@@ -702,7 +726,9 @@ class LargeRTFRibosomalSubunit {
 	}
 }
 
+function rtfDomToBBCode(rtfDom) {
 
+}
 
 
 function rtfToBBCode(rtfString) {
@@ -711,8 +737,8 @@ function rtfToBBCode(rtfString) {
 	reader.spool(rtfString);
 	console.log(reader.output);
 	writer.synthesize(reader.output);
-	const rtfDOM = writer.output;
-	console.log(rtfDOM);
+	console.log(writer.output);
+	//return rtfDomtoBBCode(writer.output);
 }
 
 
