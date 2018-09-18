@@ -284,7 +284,8 @@ class SmallRTFRibosomalSubunit {
 			this.parseControl(char);
 		} else {
 			this.operation = this.parseText;
-			this.parseText(char);
+			this.curInstruction.type = "text";
+			this.curInstruction.value += char;
 		}
 	}
 	parseControl(char) {
@@ -810,6 +811,8 @@ class BBCodeBuilder {
 			groupString += "\\n\\n";
 		} else if (group.type === "fragment" && group.contents.length === 0) {
 			groupString += "\\n\\n";
+		} else if (group.type === "listitem") {
+			groupString += "\\n";
 		}
 		return groupString;
 	}
@@ -839,9 +842,9 @@ class BBCodeBuilder {
 					this.curStyle.foreground = group.style.foreground;
 					this.stack.push("foreground");
 				} else {
-				this.stack.push(tag);
-				groupString += "[" + this.tagTable[tag] + "]";
-			}
+					this.stack.push(tag);
+					groupString += "[" + this.tagTable[tag] + "]";
+				}
 			}
 			
 		});
