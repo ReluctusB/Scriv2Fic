@@ -827,9 +827,9 @@ class BBCodeBuilder {
 			}
 		}
 
-		groupString = groupString.replace(/\n/g, "\\n")
+		groupString = groupString.replace(/\\/g, "⚐Ï⚑")
+								.replace(/\n/g, "\\n")
 								.replace(/\t/g, "\\t")
-								.replace(/\\/g, "⚐Ï⚑")
 								.replace(/"/g, `\\"`)
 								.replace(/}/g, `\\\\}`)
 								.replace(/(⚐Ï⚑){1,2}/g, "\\\\");
