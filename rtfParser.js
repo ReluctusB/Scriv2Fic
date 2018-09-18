@@ -433,7 +433,7 @@ class LargeRTFRibosomalSubunit {
 		this.curGroup.style.alignment = "center";
 	}
 	cmd$qj() {
-		this.curGroup.style.alignment = "justify";
+		this.curGroup.style.alignment = "justified";
 	}
 	cmd$qr() {
 		this.curGroup.style.alignment = "right";
@@ -784,16 +784,20 @@ class BBCodeBuilder {
 	processSupergroup(group) {
 		let groupString = "";
 
-		
+		if (group.style.alignment) {
+			if (group.style.alignment !== "left" && group.style.alignment !== "justified") {
+				groupString += "[" + group.style.alignment + "]"
+			}
+		}
 
 		if (group.style.ilvl >= 0) {
 			if (group.style.ilvl > this.curStyle.listlevel) {
 				const style = this.dom.listtable[group.style.ls - 1].levels[group.style.ilvl].attributes.nfc;
 				if (style === 23 || style > 4) {
-					groupString += "[list]";
+					groupString += "[list]\n";
 				} else {
 					const listTypes = "1IiAa";
-					groupString += "[list=" + listTypes.charAt(style) + "]";
+					groupString += "[list=" + listTypes.charAt(style) + "]\n";
 				}				
 			} else if (group.style.ilvl < this.curStyle.listlevel) {
 				for (let i=0;i<this.curStyle.listlevel-group.style.ilvl;i++) {
@@ -827,12 +831,21 @@ class BBCodeBuilder {
 			}
 		}
 
+		if (group.style.alignment) {
+			if (group.style.alignment !== "left" && group.style.alignment !== "justified") {
+				groupString += "[/" + group.style.alignment + "]"
+			}
+		}
+
 		groupString = groupString.replace(/\\/g, "⚐Ï⚑")
 								.replace(/\n/g, "\\n")
 								.replace(/\t/g, "\\t")
+								.replace(/\r/g, "\\r")
+								.replace(/\f/g, "\\f")
 								.replace(/"/g, `\\"`)
 								.replace(/}/g, `\\\\}`)
 								.replace(/(⚐Ï⚑){1,2}/g, "\\\\");
+
 
 		if (group.type === "paragraph") {
 			groupString += "\\n\\n";
@@ -841,8 +854,6 @@ class BBCodeBuilder {
 		} else if (group.type === "listitem") {
 			groupString += "\\n";
 		}
-
-		
 
 		return groupString;
 	}
@@ -864,7 +875,6 @@ class BBCodeBuilder {
 			}
 		}
 
-
 		Object.keys(this.tagTable).forEach(tag => {
 			if (group.style[tag] && !this.stack.includes(tag)) {
 				if (tag === "foreground") {
@@ -880,7 +890,20 @@ class BBCodeBuilder {
 		});
 
 		if (typeof group.contents === "string") {
-			if (group.type != "listtext") {
+			if (group.type === "field" && group.attributes.fieldtype === "HYPERLINK") {
+				if (group.attributes.fieldvalue.includes("scrivcmt:")) {
+					//hopefully something will go here one day
+					groupString += group.contents;
+				} else if (group.attributes.fieldvalue.includes("mailto:")){
+					groupString += "[email]"
+								+ group.attributes.fieldvalue.replace("mailto:","")
+								+ "[/email]";
+				} else {
+					groupString += "[url=" + group.attributes.fieldvalue + "]"
+								+ group.contents
+								+ "[/url]";
+				}				
+			} else if (group.type != "listtext") {
 				groupString += group.contents;
 			}
 		} else {
