@@ -45,7 +45,7 @@ class RTFGroup extends RTFObj {
 		this.type = type;
 	}
 	dumpContents() {
-		if (this.contents[0] && this.contents.every(entry => typeof entry === "string")) {
+		if (this.contents[0] && this.contents.every(entry => typeof entry === "string") && this.contents.every (entry => entry.style === this.contents[0].style)) {
 			this.contents = this.contents.join("");
 			if (this.type === "span") {this.type = "text";}
 		}
@@ -248,6 +248,7 @@ class SmallRTFRibosomalSubunit {
 		if (this.curIndex < this.rtfString.length) {
 			this.curChar = this.rtfString.charAt(this.curIndex);
 		} else {
+			this.setInstruction({type:"documentEnd"});
 			this.working = false;
 		}
 	}
@@ -264,11 +265,11 @@ class SmallRTFRibosomalSubunit {
 				this.setInstruction();
 				this.setInstruction({type:"groupEnd"});
 				break;
-			case "\\\n": 
-				this.setInstruction();
-				this.setInstruction({type:"frag"});
-				break;
 			case "\n": 
+				this.setInstruction();
+				this.setInstruction({type:"break"});
+				break;
+			case "\r":
 				this.setInstruction();
 				this.setInstruction({type:"break"});
 				break;
@@ -278,10 +279,14 @@ class SmallRTFRibosomalSubunit {
 		}
 	}
 	parseEscape(char) {
-		if (char.search(/[ \\{}\n]/) === -1) {
+		if (char.search(/[ \\{}\n\r]/) === -1) {
 			this.setInstruction();
 			this.operation = this.parseControl;
 			this.parseControl(char);
+		} else if (char.search(/[\n\r]/) !== -1){
+			this.curInstruction.value += char + char;
+			this.parseText(char);
+			this.operation = this.parseText;
 		} else {
 			this.operation = this.parseText;
 			this.curInstruction.type = "text";
@@ -331,8 +336,8 @@ class LargeRTFRibosomalSubunit {
 		this.defState = {font:0,fontsize:22,bold:false,italics:false};
 		this.doc = new RTFDoc;
 		this.curGroup = this.doc;
-		this.paraTypes = ["paragraph", "listitem", "fragment"];
-		this.textTypes = ["text", "listtext", "field"];
+		this.paraTypes = ["paragraph", "listitem"];
+		this.textTypes = ["text", "listtext", "field", "fragment"];
 		this.working = false;
 	}
 	synthesize(rtfInstructions) {
@@ -364,7 +369,12 @@ class LargeRTFRibosomalSubunit {
 				this.parseControl(instruction.value);
 				break;
 			case "text":
-				this.curGroup.contents.push(instruction.value);
+				if (this.curGroup.type !== "paragraph") {
+					this.curGroup.contents.push(instruction.value);
+				} else {
+					this.newGroup("fragment");
+					this.curGroup.contents.push(instruction.value);
+				}		
 				break;
 			case "groupStart":
 				this.newGroup("span");
@@ -372,9 +382,11 @@ class LargeRTFRibosomalSubunit {
 			case "groupEnd":
 				this.endGroup();
 				break;
-			case "frag":
-				this.endGroup();
-				this.newGroup("fragment");
+			case "break":
+				if (this.curGroup.type === "fragment") {this.endGroup();}
+				break;
+			case "documentEnd":
+				while (this.curGroup !== this.doc) {this.endGroup();}
 				break;
 		}
 	}
@@ -784,12 +796,14 @@ class BBCodeBuilder {
 	processSupergroup(group) {
 		let groupString = "";
 
+		/* Open alignment tags */
 		if (group.style.alignment) {
 			if (group.style.alignment !== "left" && group.style.alignment !== "justified") {
 				groupString += "[" + group.style.alignment + "]"
 			}
 		}
 
+		/* List handling */
 		if (group.style.ilvl >= 0) {
 			if (group.style.ilvl > this.curStyle.listlevel) {
 				const style = this.dom.listtable[group.style.ls - 1].levels[group.style.ilvl].attributes.nfc;
@@ -813,6 +827,7 @@ class BBCodeBuilder {
 			}
 		}
 
+		/* Subgroup processing */
 		if (typeof group.contents !== "string") {
 			group.contents.forEach(subgroup => {
 				groupString += this.processSubgroup(subgroup);
@@ -821,6 +836,7 @@ class BBCodeBuilder {
 			groupString += this.processSubgroup(group);
 		}
 
+		/* Closing remaining character tags */
 		if (this.stack.length) {
 			let stackLevel = this.stack.length;
  			while (stackLevel > 0) {
@@ -831,12 +847,14 @@ class BBCodeBuilder {
 			}
 		}
 
+		/* Closing alignment */
 		if (group.style.alignment) {
 			if (group.style.alignment !== "left" && group.style.alignment !== "justified") {
 				groupString += "[/" + group.style.alignment + "]"
 			}
 		}
 
+		/* Make string JSON friendly */
 		groupString = groupString.replace(/\\/g, "⚐Ï⚑")
 								.replace(/\n/g, "\\n")
 								.replace(/\t/g, "\\t")
@@ -846,10 +864,8 @@ class BBCodeBuilder {
 								.replace(/}/g, `\\\\}`)
 								.replace(/(⚐Ï⚑){1,2}/g, "\\\\");
 
-
+		/* Insert newlines */
 		if (group.type === "paragraph") {
-			groupString += "\\n\\n";
-		} else if (group.type === "fragment" && group.contents.length === 0) {
 			groupString += "\\n\\n";
 		} else if (group.type === "listitem") {
 			groupString += "\\n";
@@ -860,6 +876,7 @@ class BBCodeBuilder {
 	processSubgroup(group) {
 		let groupString = "";
 
+		/* Closing tags from previous subgroup */
 		if (this.stack.length) {
 			let stackLevel = this.stack.length;
  			while (stackLevel > 0) {
@@ -875,6 +892,7 @@ class BBCodeBuilder {
 			}
 		}
 
+		/* Opening tags */
 		Object.keys(this.tagTable).forEach(tag => {
 			if (group.style[tag] && !this.stack.includes(tag)) {
 				if (tag === "foreground") {
@@ -889,6 +907,7 @@ class BBCodeBuilder {
 			
 		});
 
+		/* Handling contents */
 		if (typeof group.contents === "string") {
 			if (group.type === "field" && group.attributes.fieldtype === "HYPERLINK") {
 				if (group.attributes.fieldvalue.includes("scrivcmt:")) {

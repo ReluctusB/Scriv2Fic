@@ -199,7 +199,7 @@ function makeChapter(chapterTitle, chapterBody) {
 		xhttp.send(requestBody);
 	}
 
-	//setTimeout(()=>createChapter(chapterTitle), 250);
+	setTimeout(()=>createChapter(chapterTitle), 250);
 	console.log(chapterBody);
 }
 
