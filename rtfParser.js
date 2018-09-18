@@ -327,7 +327,6 @@ class LargeRTFRibosomalSubunit {
 		this.instructions = [];
 		this.curInstruction = {};
 		this.output = {};
-		this.curState = {};
 		this.curIndex = 0;
 		this.defState = {font:0,fontsize:22,bold:false,italics:false};
 		this.doc = new RTFDoc;
@@ -339,7 +338,6 @@ class LargeRTFRibosomalSubunit {
 	synthesize(rtfInstructions) {
 		this.instructions = rtfInstructions;
 		this.output = {};
-		this.curState = {};
 		this.curIndex = 0;
 		this.defState = {font:0,fontsize:22,bold:false,italics:false};
 		this.doc = new RTFDoc;
@@ -394,7 +392,7 @@ class LargeRTFRibosomalSubunit {
 	}
 	newGroup(type) {
 		this.curGroup = new RTFGroup(this.curGroup, type);
-		this.curGroup.style = this.curGroup.parent.style ? this.curGroup.parent.curstyle : this.defStyle;
+		this.curGroup.style = this.curGroup.parent.style ? this.curGroup.parent.curstyle : this.defState;
 	}
 	endGroup() {
 		this.curGroup.dumpContents();
@@ -404,10 +402,6 @@ class LargeRTFRibosomalSubunit {
 			this.curGroup = this.doc;
 		}
 	}
-	setStyle(style) {
-		this.curGroup.style = style;
-		this.curState = style;
-	}
 
 	/* Paragraphs */
 	cmd$par() {
@@ -415,21 +409,23 @@ class LargeRTFRibosomalSubunit {
 			const prevStyle = this.curGroup.curstyle;
 			this.endGroup()
 			this.newGroup("paragraph");
-			this.setStyle(prevStyle);
+			this.curGroup.style = prevStyle;
 		} else {
 			this.newGroup("paragraph");
 		}	
 	}
 	cmd$pard() {
 		if (this.paraTypes.includes(this.curGroup.type)) {
-			this.setStyle(this.defState);
+			this.curGroup.style = JSON.parse(JSON.stringify(this.defState));
 		} else {
 			this.newGroup("paragraph");
-			this.setStyle(this.defState);
+			this.curGroup.style = JSON.parse(JSON.stringify(this.defState));
 		}
 	}
 	cmd$plain() {
-		this.setStyle(this.defState);
+		Object.keys(this.defState).forEach(key => {
+			this.curGroup.style[key] = this.defState[key];
+		});
 	}
 
 	/* Alignment */
@@ -767,7 +763,7 @@ class BBCodeBuilder {
 		this.dom = rtfDom;
 		this.curGroup = this.dom.contents[0];
 		this.stack = [];
-		this.curStyle = {alignment: "left", listlevel:0, foreground:{}};
+		this.curStyle = {alignment: "left", listlevel:-1, foreground:{}};
 		this.curIndex = 0;
 		this.output = "";
 		this.working = true;
@@ -788,6 +784,31 @@ class BBCodeBuilder {
 	processSupergroup(group) {
 		let groupString = "";
 
+		
+
+		if (group.style.ilvl >= 0) {
+			if (group.style.ilvl > this.curStyle.listlevel) {
+				const style = this.dom.listtable[group.style.ls - 1].levels[group.style.ilvl].attributes.nfc;
+				if (style === 23 || style > 4) {
+					groupString += "[list]";
+				} else {
+					const listTypes = "1IiAa";
+					groupString += "[list=" + listTypes.charAt(style) + "]";
+				}				
+			} else if (group.style.ilvl < this.curStyle.listlevel) {
+				for (let i=0;i<this.curStyle.listlevel-group.style.ilvl;i++) {
+					groupString += "[/list]";
+				}		
+			}
+			groupString += "[*]";
+			this.curStyle.listlevel = group.style.ilvl
+		} else if (this.curStyle.listlevel !== -1) {
+			while (this.curStyle.listlevel > -1) {
+				groupString += "[/list]";
+				this.curStyle.listlevel--;
+			}
+		}
+
 		if (typeof group.contents !== "string") {
 			group.contents.forEach(subgroup => {
 				groupString += this.processSubgroup(subgroup);
@@ -806,6 +827,12 @@ class BBCodeBuilder {
 			}
 		}
 
+		groupString = groupString.replace(/\n/g, "\\n")
+								.replace(/\t/g, "\\t")
+								.replace(/\\/g, "⚐Ï⚑")
+								.replace(/"/g, `\\"`)
+								.replace(/}/g, `\\\\}`)
+								.replace(/(⚐Ï⚑){1,2}/g, "\\\\");
 
 		if (group.type === "paragraph") {
 			groupString += "\\n\\n";
@@ -814,6 +841,9 @@ class BBCodeBuilder {
 		} else if (group.type === "listitem") {
 			groupString += "\\n";
 		}
+
+		
+
 		return groupString;
 	}
 	processSubgroup(group) {
@@ -860,7 +890,6 @@ class BBCodeBuilder {
 
 		}
 
-
 		return groupString;
 	}
 }
@@ -876,8 +905,7 @@ function rtfToBBCode(rtfString) {
 	console.log(writer.output);
 	builder.build(writer.output);
 	console.log(builder.output);
-
-	//return rtfDomtoBBCode(writer.output);
+	return builder.output;
 }
 
 
