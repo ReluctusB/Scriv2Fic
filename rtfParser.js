@@ -241,6 +241,7 @@ class SmallRTFRibosomalSubunit {
 			this.operation(this.curChar);
 			this.advancePos();
 		}
+		return this.output;
 	}
 	advancePos() {
 		this.curIndex++;
@@ -262,6 +263,10 @@ class SmallRTFRibosomalSubunit {
 			case "}": 
 				this.setInstruction();
 				this.setInstruction({type:"groupEnd"});
+				break;
+			case "\\\n": 
+				this.setInstruction();
+				this.setInstruction({type:"frag"});
 				break;
 			case "\n": 
 				this.setInstruction();
@@ -344,6 +349,7 @@ class LargeRTFRibosomalSubunit {
 			this.advancePos();
 		}
 		this.output = this.doc.dumpContents();
+		return this.output;
 	}
 	advancePos() {
 		this.curIndex++;
@@ -367,7 +373,7 @@ class LargeRTFRibosomalSubunit {
 			case "groupEnd":
 				this.endGroup();
 				break;
-			case "break":
+			case "frag":
 				this.endGroup();
 				this.newGroup("fragment");
 				break;
@@ -427,16 +433,16 @@ class LargeRTFRibosomalSubunit {
 
 	/* Alignment */
 	cmd$qc() {
-		this.curGroup.style.align = "center";
+		this.curGroup.style.alignment = "center";
 	}
 	cmd$qj() {
-		this.curGroup.style.align = "justify";
+		this.curGroup.style.alignment = "justify";
 	}
 	cmd$qr() {
-		this.curGroup.style.align = "right";
+		this.curGroup.style.alignment = "right";
 	}
 	cmd$ql() {
-		this.curGroup.style.align = "left";
+		this.curGroup.style.alignment = "left";
 	}
 
 	/* Text Direction */
@@ -726,18 +732,148 @@ class LargeRTFRibosomalSubunit {
 	}
 }
 
-function rtfDomToBBCode(rtfDom) {
+class BBCodeBuilder {
+	constructor() {
+		this.dom = {};
+		this.curGroup = {};
+		this.stack = [];
+		this.curStyle = {};
+		this.curIndex = 0;
+		this.output = "";
+		this.working = false;
+		this.tagTable = {
+			italics: "i",
+			bold: "b",
+			underline: "u",
+			strikethrough: "s",
+			smallcaps: "smcaps",
+			superscript: "sup",
+			subscript: "sub",
+			foreground: "color",
+			hyperlink: "url"
+		}
+	}
+	rgbToHex(rgbObject) {
+	 	let outStr = "#"
+	 	let rgbArray = [rgbObject.red, rgbObject.green, rgbObject.blue];
+	 	rgbArray.forEach(val => {
+	 		let hex = parseInt(val).toString(16);
+	 		outStr += hex.length == 1 ? "0" + hex : hex;
+	 	});
+	 	return outStr;
+	}
+	build(rtfDom) {
+		this.dom = rtfDom;
+		this.curGroup = this.dom.contents[0];
+		this.stack = [];
+		this.curStyle = {alignment: "left", listlevel:0, foreground:{}};
+		this.curIndex = 0;
+		this.output = "";
+		this.working = true;
+		while (this.working === true) {
+			this.output += this.processSupergroup(this.curGroup);
+			this.advancePos();
+		}
+		return this.output;
+	}
+	advancePos() {
+		this.curIndex++;
+		if (this.curIndex < this.dom.contents.length) {
+			this.curGroup = this.dom.contents[this.curIndex];
+		} else {
+			this.working = false;
+		}
+	}
+	processSupergroup(group) {
+		let groupString = "";
 
+		if (typeof group.contents !== "string") {
+			group.contents.forEach(subgroup => {
+				groupString += this.processSubgroup(subgroup);
+			});
+		} else {
+			groupString += this.processSubgroup(group);
+		}
+
+		if (this.stack.length) {
+			let stackLevel = this.stack.length;
+ 			while (stackLevel > 0) {
+ 				if (this.stack[stackLevel-1] === "foreground") {this.curStyle.foreground = {}}
+ 				groupString += "[/" + this.tagTable[this.stack[stackLevel-1]] + "]";
+ 				this.stack.splice(stackLevel-1, 1);
+				stackLevel --;
+			}
+		}
+
+
+		if (group.type === "paragraph") {
+			groupString += "\\n\\n";
+		} else if (group.type === "fragment" && group.contents.length === 0) {
+			groupString += "\\n\\n";
+		}
+		return groupString;
+	}
+	processSubgroup(group) {
+		let groupString = "";
+
+		if (this.stack.length) {
+			let stackLevel = this.stack.length;
+ 			while (stackLevel > 0) {
+ 				if (this.stack[stackLevel-1] === "foreground" && group.style.foreground !== this.curStyle.foreground) {
+ 					groupString += "[/color]";
+ 					this.stack.splice(stackLevel-1, 1);
+ 				} else if (!group.style[this.stack[stackLevel-1]]) {
+ 					if (this.stack[stackLevel-1] === "foreground") {this.curStyle.foreground = {}}
+ 					groupString += "[/" + this.tagTable[this.stack[stackLevel-1]] + "]";
+ 					this.stack.splice(stackLevel-1, 1);
+ 				}		
+				stackLevel --;
+			}
+		}
+
+
+		Object.keys(this.tagTable).forEach(tag => {
+			if (group.style[tag] && !this.stack.includes(tag)) {
+				if (tag === "foreground") {
+					groupString += "[color=" + this.rgbToHex(group.style.foreground) + "]";
+					this.curStyle.foreground = group.style.foreground;
+					this.stack.push("foreground");
+				} else {
+				this.stack.push(tag);
+				groupString += "[" + this.tagTable[tag] + "]";
+			}
+			}
+			
+		});
+
+		if (typeof group.contents === "string") {
+			if (group.type != "listtext") {
+				groupString += group.contents;
+			}
+		} else {
+			group.contents.forEach(subgroup => {
+				groupString += this.processSubgroup(subgroup);
+			});
+
+		}
+
+
+		return groupString;
+	}
 }
 
 
 function rtfToBBCode(rtfString) {
-	reader = new SmallRTFRibosomalSubunit;
-	writer = new LargeRTFRibosomalSubunit;
+	const reader = new SmallRTFRibosomalSubunit;
+	const writer = new LargeRTFRibosomalSubunit;
+	const builder = new BBCodeBuilder;
 	reader.spool(rtfString);
 	console.log(reader.output);
 	writer.synthesize(reader.output);
 	console.log(writer.output);
+	builder.build(writer.output);
+	console.log(builder.output);
+
 	//return rtfDomtoBBCode(writer.output);
 }
 
