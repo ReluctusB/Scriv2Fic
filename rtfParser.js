@@ -939,7 +939,6 @@ class BBCodeBuilder {
 			group.contents.forEach(subgroup => {
 				groupString += this.processSubgroup(subgroup);
 			});
-
 		}
 
 		return groupString;
@@ -950,6 +949,7 @@ function rtfToBBCode(rtfString) {
 	const reader = new SmallRTFRibosomalSubunit;
 	const writer = new LargeRTFRibosomalSubunit;
 	const builder = new BBCodeBuilder;
+	//builder.build(writer.synthesize(reader.spool));
 	reader.spool(rtfString);
 	console.log(reader.output);
 	writer.synthesize(reader.output);

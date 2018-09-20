@@ -2,6 +2,8 @@
 let authToken = null;
 let queue = [];
 let storyID = 0;
+let errorLog = "";
+let errors = 0;
 const apiURL = "https://www.fimfiction.net/api/v2/";
 
 /* Gets an access token via the implicit OAuth2 flow and stores it in localstorage.
@@ -14,6 +16,7 @@ function getToken(callback) {
 		if (authToken) {
 			callback();
 		} else if (retries >= 60) {
+			console.error("Couldn't get an authorization token! Request timed out.");
 			notify("Error: Couldn't get an authorization token! Request timed out.");
 		} else {
 			console.log("Waiting for authorization...");
@@ -47,8 +50,10 @@ function getToken(callback) {
 			authToken = token;
 		} else if (returnState){
 			console.error("State mismatch in authorization response!");
+			notify("Error: State mismatch in authorization response!");
 		} else {
 			console.error("Authorization response was invalid!");
+			notify("Error: Authorization response was invalid!");
 		}
 	});
 
@@ -63,10 +68,12 @@ function handleErrors(errorData, action, rateRemaining, retryFunction) {
 			notify("Error: 404! Fimfiction may be down. Try again later!");
 			break;
 		case 4001: //Bad JSON
-			notify(`Error: Invalid JSON! There's something about "${action}" that we just didn't like. Please send an error report to user RB_ with your chapter's text and title.`);
+			errors = 1;
+			errorLog += `[h3]Error: Invalid JSON![/h3] There's something about chapter <${action}> that didn't agree with our parser. Please send an error report to user [url=https://www.fimfiction.net/user/34408/RB_]RB_[/url] with your chapter's text and title.[hr]`;
+			queueDown();
 			break;
 		case 4030: //Invalid permission (probably switched user)
-			notify("Error: Invalid permissions! If you have switched to a different account, please go back to that account and delete the extra session from your session list.");
+			notify("Error: Invalid permissions! If you have switched from a different account, delete the extra session from its session list.");
 			break;
 		case 4032: //Invalid token
 			console.log("Stored token has expired or was invalid. Fetching a new one.");
@@ -74,17 +81,21 @@ function handleErrors(errorData, action, rateRemaining, retryFunction) {
 			getToken(retryFunction);
 			break;
 		case 4225: //Invalid argument (Chapter too long)
-			notify(`Error:  Chapter ${action} too long! We're sorry; because of a limitation with the API, we are currently unable to upload chapters beyond a certain length.`);
+			errors = 1;
+			errorLog += `[h3]Chapter <${action}> too long![/h3] We're sorry; because of a limitation with the API, we are currently unable to upload chapters beyond a certain length. You will have to upload this chapter manually. We apologize for the inconveinience.[hr]`;
+			queueDown();
 			break;
 		case 4290: //Rate limited
 			setTimeout(retryFunction, rateRemaining*1000 + 1000);
-			notify(`Warning: The application has been rate limited. Halting progress until limit has expired (${rateRemaining} seconds).`);
+			notify(`Warning: Rate limited. Halting progress for ${rateRemaining} seconds.`);
 			break;
 		case 5000: //Internal server error
 			notify("Error: Internal Error! Something went wrong on Fimfiction's end. Try again, and if the problem persists, please contact user RB_.");
 			break;
 		default:
-			notify(`Error: Critical faliure! Something has gone horribly wrong. Please contact user RB_ and give him this: "${errorData.code}: ${errorData.detail}"`);
+			errors = 1;
+			errorLog += `[h3]Critical Faliure[/h3] Something has gone horribly wrong. Please contact user [url=https://www.fimfiction.net/user/34408/RB_]RB_[/url] and give him this:\\n\\n[codeblock]${action}\\n${errorData.code}: ${errorData.title}\\n ${errorData.detail}[/codeblock][hr]`;
+			queueDown();
 	}
 }
 
@@ -126,7 +137,7 @@ function deleteExistingChapters(callback) {
 						handleErrors(response.errors[0], "Chapter delete", rateTime, () => deleteChapters(chapters));
 					}
 				} else {
-					console.log("Successfully deleted chapter" + curChapter.attributes.title);
+					console.log("Successfully deleted chapter " + curChapter.attributes.title);
 					if (chapters.length) {
 						setTimeout(()=>deleteChapters(chapters), 250);
 					} else {
@@ -200,12 +211,11 @@ function makeChapter(chapterTitle, chapterBody) {
 	}
 
 	setTimeout(()=>createChapter(chapterTitle), 250);
-	console.log(chapterBody);
 }
 
 /* Creates a Chrome notification */
 function notify(message) {
-	chrome.notifications.create(storyID, {
+	chrome.notifications.create({
 		"type": "basic",
 		"title": "Scriv2Fic",
 		"message": message,
@@ -220,10 +230,17 @@ function queueDown() {
 		makeChapter(queue[0].title, queue[0].body);
 		queue.shift();
 	} else {
-		notify("Mission success! Your story has been uploaded to Fimfiction.");
+		if (errors === 0) {
+			notify("Mission success! Your story has been uploaded to Fimfiction.");
+		} else if (errors === 1) {
+			errors = 2;
+			makeChapter(":Error Log:", errorLog);
+			notify("There were some errors while uploading your story. Check the story for details.");
+			return;
+		}
+		errorLog = "";
 		const storyURL = "https://www.fimfiction.net/story/" + storyID + "/*"
 		chrome.tabs.query({url:storyURL}, tab => {if (tab[0]) {chrome.tabs.reload(tab[0].id);}})
-		return;
 	}
 }
 
