@@ -18,13 +18,15 @@ function getToken(callback) {
 		} else if (retries >= 60) {
 			console.error("Couldn't get an authorization token! Request timed out.");
 			notify("Error: Couldn't get an authorization token! Request timed out.");
+			return;
 		} else {
-			console.log("Waiting for authorization...");
+			console.log("Waiting for authorization... (tried " + retries + " times)");
 			setTimeout(()=>waitForAuth(retries+1), 2000);
 		}
 	}
 
 	const reDirURL = chrome.identity.getRedirectURL();
+	console.log(reDirURL);
 	const clientID = "mGzeZKcuYZZtaOvOW361xC3qlHPnLriw";
 	const rArray = new Uint32Array(8);
 	const state = window.crypto.getRandomValues(rArray).join("");
@@ -82,7 +84,7 @@ function handleErrors(errorData, action, rateRemaining, retryFunction) {
 			break;
 		case 4225: //Invalid argument (Chapter too long)
 			errors = 1;
-			errorLog += `[h3]Chapter <${action}> too long![/h3] We're sorry; because of a limitation with the API, we are currently unable to upload chapters beyond a certain length. You will have to upload this chapter manually. We apologize for the inconveinience.[hr]`;
+			errorLog += `[h3]Chapter <${action}> too long![/h3] We're sorry; because of a limitation with the API, we are currently unable to upload chapters beyond a certain length. You will have to upload this chapter manually. We apologize for the inconvenience.[hr]`;
 			queueDown();
 			break;
 		case 4290: //Rate limited
@@ -215,13 +217,14 @@ function makeChapter(chapterTitle, chapterBody) {
 
 /* Creates a Chrome notification */
 function notify(message) {
+	const storyURL = "https://www.fimfiction.net/story/" + storyID;
 	chrome.notifications.create({
 		"type": "basic",
 		"title": "Scriv2Fic",
 		"message": message,
 		"iconUrl": chrome.extension.getURL("Icons/scriv2ficIcon128.png"),
 	});	
-	chrome.notifications.onClicked.addListener(id => window.open('https://www.fimfiction.net/story/'+id, '_blank'));
+	chrome.notifications.onClicked.addListener(() => window.open(storyURL, '_blank'));
 }
 
 /* Unloads the chapter queue. Notifies user when done.*/
@@ -238,7 +241,7 @@ function queueDown() {
 			notify("There were some errors while uploading your story. Check the story for details.");
 			return;
 		}
-		errorLog = "";
+		errorLog = ""; errors = 0;
 		const storyURL = "https://www.fimfiction.net/story/" + storyID + "/*"
 		chrome.tabs.query({url:storyURL}, tab => {if (tab[0]) {chrome.tabs.reload(tab[0].id);}})
 	}

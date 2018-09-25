@@ -58,7 +58,7 @@ class RTFGroup extends RTFObj {
 	}
 }
 
-class parameterGroup extends RTFObj {
+class ParameterGroup extends RTFObj {
 	constructor (parent, parameter) {
 		super(parent);
 		this.param = parameter;
@@ -220,6 +220,22 @@ class Fldrslt extends RTFObj {
 	}
 }
 
+class Picture extends RTFObj {
+	constructor(parent) {
+		super(parent);
+		this.contents = [];
+		this.type = "picture"
+	}
+	dumpContents() {
+		this.parent.contents.push({
+			attributes: this.curattributes,
+			image: this.contents,
+			style: this.curstyle,
+			type: this.type
+		});
+	}
+}
+
 class SmallRTFRibosomalSubunit {
 	constructor() {
 		this.rtfString = "";
@@ -227,7 +243,7 @@ class SmallRTFRibosomalSubunit {
 		this.curChar = "";
 		this.curIndex = 0;
 		this.output = [];
-		this.operation = this.parseText;
+		this.operation = {};
 		this.working = false;
 	}
 	spool(rtfStringIn) {
@@ -333,9 +349,9 @@ class LargeRTFRibosomalSubunit {
 		this.curInstruction = {};
 		this.output = {};
 		this.curIndex = 0;
-		this.defState = {font:0,fontsize:22,bold:false,italics:false};
-		this.doc = new RTFDoc;
-		this.curGroup = this.doc;
+		this.defState = {};
+		this.doc = {};
+		this.curGroup = {};
 		this.paraTypes = ["paragraph", "listitem"];
 		this.textTypes = ["text", "listtext", "field", "fragment"];
 		this.working = false;
@@ -344,7 +360,19 @@ class LargeRTFRibosomalSubunit {
 		this.instructions = rtfInstructions;
 		this.output = {};
 		this.curIndex = 0;
-		this.defState = {font:0,fontsize:22,bold:false,italics:false};
+		this.defState = {
+			font:0,
+			fontsize:22,
+			bold:false,
+			italics:false,
+			underline:false,
+			strikethrough:false,
+			smallcaps:false,
+			subscript:false,
+			superscript:false,
+			foreground:false,
+			background:false
+		};
 		this.doc = new RTFDoc;
 		this.curGroup = this.doc;
 		this.working = true;
@@ -436,7 +464,9 @@ class LargeRTFRibosomalSubunit {
 	}
 	cmd$plain() {
 		Object.keys(this.defState).forEach(key => {
-			this.curGroup.style[key] = this.defState[key];
+			if (this.curGroup.style[key]) {
+				this.curGroup.style[key] = this.defState[key];
+			}	
 		});
 	}
 
@@ -578,11 +608,120 @@ class LargeRTFRibosomalSubunit {
 		this.curGroup = new Field(this.curGroup.parent);
 	}
 	cmd$fldinst() {
-		this.curGroup = new parameterGroup(this.curGroup.parent, "fieldInst");
+		this.curGroup = new ParameterGroup(this.curGroup.parent, "fieldInst");
 	}
 	cmd$fldrslt() {
 		this.curGroup = new Fldrslt(this.curGroup.parent);
 	}
+
+	/* Pictures */
+	cmd$shppict() {
+		this.curGroup.type = "shppict";
+	}
+	cmd$pict() {
+		this.curGroup = new Picture(this.curGroup.parent);
+	}
+	cmd$nisusfilename() {
+		this.curGroup = new ParameterGroup(this.curGroup.parent, "nisusfilename");
+	}
+	cmd$nonshppict() {
+		this.curGroup.attributes.nonshppict = false;
+	}
+	cmd$emfblip() {
+		this.curGroup.attributes.source = "EMF";
+	}
+	cmd$pngblip() {
+		this.curGroup.attributes.source = "PNG";
+	}
+	cmd$jpegblip() {
+		this.curGroup.attributes.source = "JPEG";
+	}
+	cmd$macpict() {
+		this.curGroup.attributes.source = "QUICKDRAW";
+	}
+	cmd$pmmetafile(val) {
+		this.curGroup.attributes.source = "OS/2 METAFILE";
+		this.curGroup.attributes.sourcetype = val;
+	}
+	cmd$wmetafile(val) {
+		this.curGroup.attributes.source = "WINDOWS METAFILE";
+		this.curGroup.attributes.mappingmode = val;
+	}
+	cmd$dibitmap(val) {
+		this.curGroup.attributes.source = "WINDOWS DI BITMAP";
+		this.curGroup.attributes.sourcetype = val;
+	}
+	cmd$wbitmap(val) {
+		this.curGroup.attributes.source = "WINDOWS DD BITMAP";
+		this.curGroup.attributes.sourcetype = val;
+	}
+	cmd$wbmbitspixel(val) {
+		this.curGroup.attributes.bitspixel = val;
+	}
+	cmd$wbmplanes(val) {
+		this.curGroup.attributes.planes = val;
+	}
+	cmd$wbmwidthbytes(val) {
+		this.curGroup.attributes.widthbytes = val;
+	}
+	cmd$picw(val) {
+		this.curGroup.style.width = val;
+	}
+	cmd$pich(val) {
+		this.curGroup.style.height = val;
+	}
+	cmd$picwgoal(val) {
+		this.curGroup.style.widthgoal = val;
+	}
+	cmd$pichgoal(val) {
+		this.curGroup.style.heightgoal = val;
+	}
+	cmd$picscalex(val) {
+		this.curGroup.style.scalex = val;
+	}
+	cmd$picscaley(val) {
+		this.curGroup.style.scaley = val;
+	}
+	cmd$picscaled() {
+		this.curGroup.style.scaled = true;
+	}
+	cmd$piccropt(val) {
+		this.curGroup.style.croptop = val;
+	}
+	cmd$piccropb(val) {
+		this.curGroup.style.cropbottom = val;
+	}
+	cmd$piccropl(val) {
+		this.curGroup.style.cropleft = val;
+	}
+	cmd$piccropr(val) {
+		this.curGroup.style.cropright = val;
+	}
+	cmd$picprop(val) {
+		this.curGroup = new ParameterGroup(this.curGroup.parent, "prop");
+	}
+	cmd$defshp() {
+		this.curGroup.style.shape = true;
+	}
+	cmd$picbmp() {
+		this.curGroup.attributes.bitmap = true;
+	}
+	cmd$picbpp(val) {
+		this.curGroup.attributes.bpp = val;
+	}
+	cmd$bin(val) {
+		this.curGroup.attributes.binary = val;
+	}
+	cmd$blipupi(val) {
+		this.curGroup.attributes.upi = val;
+	}
+	cmd$blipuid() {
+		this.curGroup = new ParameterGroup(this.curGroup.parent, "uid");
+	}
+	cmd$bliptag(val) {
+		this.curGroup.attributes.tag = val;
+	}
+
 
 	/* Font Table */
 	cmd$fonttbl() {
@@ -663,7 +802,7 @@ class LargeRTFRibosomalSubunit {
 		this.curGroup.attributes.hybrid = true;
 	}
 	cmd$listname() {
-		this.curGroup = new parameterGroup(this.curGroup.parent, "listname");
+		this.curGroup = new ParameterGroup(this.curGroup.parent, "listname");
 	}
 	cmd$liststyleid(val) {
 		this.curGroup.attributes.styleid = val;
@@ -697,10 +836,10 @@ class LargeRTFRibosomalSubunit {
 		this.curGroup.attributes.jcn = val;
 	}
 	cmd$leveltext() {
-		this.curGroup = new parameterGroup(this.curGroup.parent, "leveltext");
+		this.curGroup = new ParameterGroup(this.curGroup.parent, "leveltext");
 	}
 	cmd$levelnumbers(val) {
-		this.curGroup = new parameterGroup(this.curGroup.parent, "levelnumbers");
+		this.curGroup = new ParameterGroup(this.curGroup.parent, "levelnumbers");
 	}
 	cmd$levelfollow(val) {
 		this.curGroup.attributes.follow = val;
@@ -810,7 +949,7 @@ class BBCodeBuilder {
 		/* Open alignment tags */
 		if (group.style.alignment) {
 			if (group.style.alignment !== "left" && group.style.alignment !== "justified") {
-				groupString += "[" + group.style.alignment + "]"
+				groupString += "[" + group.style.alignment + "]";
 			}
 		}
 
@@ -841,7 +980,12 @@ class BBCodeBuilder {
 		/* Subgroup processing */
 		if (typeof group.contents !== "string") {
 			group.contents.forEach(subgroup => {
-				groupString += this.processSubgroup(subgroup);
+				if (typeof subgroup !== "string") {
+					groupString += this.processSubgroup(subgroup);
+				} else {
+					groupString += subgroup;
+					console.error("This didn't process correctly:\n" + JSON.stringify(group));
+				}		
 			});
 		} else {
 			groupString += this.processSubgroup(group);
@@ -886,6 +1030,11 @@ class BBCodeBuilder {
 	}
 	processSubgroup(group) {
 		let groupString = "";
+
+		/* Ignored group types */
+		if (group.type === "shppict") {
+			return groupString;
+		}
 
 		/* Closing tags from previous subgroup */
 		if (this.stack.length) {
