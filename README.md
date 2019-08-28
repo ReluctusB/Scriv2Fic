@@ -1,5 +1,5 @@
 # Scriv2Fic
-## This application is not open for public use at the present time. We're currently waiting on an okay from Knighty.
+## ~~This application is not open for public use at the present time. We're currently waiting on an okay from Knighty.~~ Project retired due to poor and inconsistant support for extensions in major browsers making development a nightmare. Use https://github.com/ReluctusB/Scriv2Fic.com instead.
 Scriv2Fic is a Chrome/Firefox browser extension that enables direct compilation and uploading of Scrivener projects to Fimfiction. 
 It can upload individual chapters, groups of chapters, or entire projects at a time. It also automatically converts your documents into 
 Fimfiction-compliant BBCode. It is accessed through the "Import Chapter" menu on Fimfiction's story pages.
